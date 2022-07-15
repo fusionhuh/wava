@@ -117,11 +117,11 @@ vec3 operator*(vec3 vec, matrix3 mat)
   return { vec * mat.col_one, vec * mat.col_two, vec * mat.col_three };
 }
 
-void draw_donut (float A, float B, color_tag (&output)[SCREEN_HEIGHT][SCREEN_WIDTH], float (&zbuffer)[SCREEN_HEIGHT][SCREEN_WIDTH])
+void draw_donut (float A, float B, float radius, color_tag (&output)[SCREEN_HEIGHT][SCREEN_WIDTH], float (&zbuffer)[SCREEN_HEIGHT][SCREEN_WIDTH])
 {
   for (float theta=0; theta < 2*pi; theta += theta_spacing) {
     for (float phi=0; phi < 2*pi; phi += phi_spacing) {
-      float circlex = R2 + R1*cos (theta);
+      float circlex = radius + R1*cos (theta);
       float circley = R1*sin (theta);
 
       matrix3 matrix_one = matrix3 ('y', phi);
@@ -129,7 +129,7 @@ void draw_donut (float A, float B, color_tag (&output)[SCREEN_HEIGHT][SCREEN_WID
       matrix3 matrix_three = matrix3 ('z', B);
 
       color_tag curr_tag;
-      if (circlex - R2 > 0) {
+      if (circlex - radius > 0) {
         int type = (int) (abs (circley/R1) * 3) + 1;
         if (type > 3) { type = 3; }
         curr_tag.type = type;
@@ -297,19 +297,19 @@ void draw_prism (float A, float B, color_tag (&output)[SCREEN_HEIGHT][SCREEN_WID
   }
 }
 
-void render_frame (float A, float B)
+void render_frame (float A, float B, float temp_value)
 {
   color_tag output[SCREEN_WIDTH][SCREEN_HEIGHT] = { 0, 0 };
   float zbuffer[SCREEN_WIDTH][SCREEN_HEIGHT] = { 0 };
 
-  draw_donut (A, B, output, zbuffer);
+  draw_donut (A, B, temp_value, output, zbuffer);
   //draw_donut (A + 5, B + 5, output, zbuffer);
   //draw_sphere (A, B, output, zbuffer);
   //draw_donut (A + 10, B + 10, output, zbuffer);
   //draw_donut (A + 15, B + 15, output, zbuffer);
   //draw_donut (A + 20, B + 20, output, zbuffer);
 
-  draw_prism (A+5, B+5, output, zbuffer);
+  //draw_prism (A+5, B+5, output, zbuffer);
   //draw_prism (A+10, B+10, output, zbuffer);
   //draw_prism (A, B, output, zbuffer);
 

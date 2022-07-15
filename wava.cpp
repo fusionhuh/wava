@@ -26,15 +26,36 @@ int curr_fftw_data_size = 0;
 std::mutex mtx;
 
 struct fftw_analysis {
-
+  float average_bass_value = 0;
 };
 
-int access_fftw_buffer(bool write, double* data, int data_length /*only applicable for writes*/, fftw_analysis* analysis) {
+fftw_analysis analyze_fftw_data() {
+  if (curr_fftw_data_size <= 0) { return (fftw_analysis) {0}; }
+
+  float highest_bass_frequency = 200;
+  int index = (int) ((highest_bass_frequency/(SAMPLE_RATE/2)) * curr_fftw_data_size);
+
+  float average_value = 0;
+
+  for (int i = 0; i < index; ++i) {
+    //printf ("inside loop, data value is: %f\n", fftw_data[i]);
+    average_value+=fftw_data[i];
+  }
+
+  average_value/=index;
+
+  //printf ("Average value is: %f", average_value);
+
+  return (fftw_analysis) {average_value};
+}
+
+int access_fftw_buffer(bool write, double* data, int data_length /*only applicable for writes*/, fftw_analysis &analysis) {
   if (!(mtx.try_lock())) { // accessing failed, locked by other thread
     mtx.unlock();
     //printf ("locked\n");
     return -1; // failure code
   } 
+
   else {
     if(write) { // pa thread is trying to write
       if (data_length > BUFFER_SIZE) {
@@ -50,7 +71,7 @@ int access_fftw_buffer(bool write, double* data, int data_length /*only applicab
       return 0;
     }
     else { // draw thread is trying to read
-      // fftw_analysis analysis = analyze_fftw_data(data);
+      analysis = analyze_fftw_data();
       mtx.unlock();
       return 0;
     }
@@ -123,7 +144,8 @@ void pa_stream_read_cb(pa_stream *stream, const size_t nbytes, void* userdata)
 
     //printf("here\n");
 
-    int err = access_fftw_buffer(true, amplitude_data, actualbytes, NULL);
+    fftw_analysis shut_the_fuck_up_gcc = (fftw_analysis) {0}; // <- this is HORRENDOUS PLEASE FIX THIS
+    int err = access_fftw_buffer(true, amplitude_data, actualbytes, shut_the_fuck_up_gcc); // <- this is seriously flawed and needs work
 
     fftw_destroy_plan(p);
     free(in); fftw_free(out); free(amplitude_data);
@@ -180,13 +202,19 @@ int draw () {
 
   //main drawing loop
 
+  fftw_analysis analysis;
+
   while (true)
   {
     if (time == (int) 1/speed) { A = 0; B = 0; time = 0; }
     
-    int err = access_fftw_buffer(false, NULL, 0, NULL);
+    int err = access_fftw_buffer(false, NULL, 0, analysis);
     
-    render_frame (A, B);
+    if (err == 0) {
+      //printf ("Average bass value: %f\n", analysis.average_bass_value);
+    }
+
+    render_frame (A, B, 2 + (0.5 * analysis.average_bass_value * analysis.average_bass_value));
     usleep (1000);
     A += 3.14 * 2 * speed; 
     B += 3.14 * 2 * speed;

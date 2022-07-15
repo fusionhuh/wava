@@ -5,6 +5,6 @@
 #define SCREEN_HEIGHT 55
 
 // geometry/matrix portion
-void render_frame (float A, float B);
+void render_frame (float A, float B, float temp_value);
 
 #endif
