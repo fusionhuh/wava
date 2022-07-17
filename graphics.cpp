@@ -3,6 +3,8 @@
 #include <unistd.h>
 #include <time.h>
 #include <string>
+#include <mutex>
+#include <thread>
 
 
 // Based HEAVILY on: https://www.a1k0n.net/2011/07/20/donut-math.html
@@ -26,6 +28,8 @@ const float K2 = 15;
 const float K1 = SCREEN_WIDTH*K2*3/(8*(R1+R2));
 
 const char* print_char = "  ";
+
+std::mutex mutex;
 
 struct vec3
 {
@@ -70,6 +74,9 @@ struct color_tag
   int type = 0;
   float luminance = 0;
 };
+
+color_tag output[SCREEN_WIDTH][SCREEN_HEIGHT] = { 0, 0 };
+float zbuffer[SCREEN_WIDTH][SCREEN_HEIGHT] = { 0 };
 
 struct color_palette {
   
@@ -117,8 +124,31 @@ vec3 operator*(vec3 vec, matrix3 mat)
   return { vec * mat.col_one, vec * mat.col_two, vec * mat.col_three };
 }
 
-void draw_donut (float A, float B, float radius, color_tag (&output)[SCREEN_HEIGHT][SCREEN_WIDTH], float (&zbuffer)[SCREEN_HEIGHT][SCREEN_WIDTH])
+int get_index(int curr_x, int curr_y) {
+  return (curr_x*SCREEN_HEIGHT + curr_y);
+}
+
+void write_to_z_buffer_and_output(float* ooz_data, float* L_data) { // change this name
+  mutex.lock();
+  for(int x = 0; x < SCREEN_WIDTH; x++) {
+    for(int y = 0; y < SCREEN_HEIGHT; y++) {
+      if (ooz_data[get_index(x, y)] > zbuffer[x][y]) {
+        zbuffer[x][y] = ooz_data[get_index(x, y)];
+        //printf ("%d\n", get_index(x,y));
+        output[x][y] = (color_tag) {1, L_data[get_index(x, y)]};
+      }
+    }
+  }
+  mutex.unlock();
+}
+
+
+
+void draw_donut (float A, float B, float radius)
 {
+  auto ooz_data = new float[SCREEN_WIDTH * SCREEN_HEIGHT]();
+  auto L_data = new float[SCREEN_WIDTH * SCREEN_HEIGHT]();
+
   for (float theta=0; theta < 2*pi; theta += theta_spacing) {
     for (float phi=0; phi < 2*pi; phi += phi_spacing) {
       float circlex = radius + R1*cos (theta);
@@ -138,7 +168,7 @@ void draw_donut (float A, float B, float radius, color_tag (&output)[SCREEN_HEIG
         curr_tag.type = ((int) (6 * diff)) + 4;
       }
 
-      vec3 pos = { circlex, circley, 0 };
+      vec3 pos = { circlex, circley, 0.000001 };
 
       vec3 transformed_pos = pos * matrix_one * matrix_two * matrix_three;
       transformed_pos.z += K2;
@@ -158,17 +188,27 @@ void draw_donut (float A, float B, float radius, color_tag (&output)[SCREEN_HEIG
       vec3 light = {0, 1, -0.2};
       light.normalize();
 
-      float L = normal * light;
+      //uint8_t L = (uint8_t) (normal * light * 255.0);
+      float L = (normal * light);
       if (L < 0) { L = 0; }
 
-      if(ooz > zbuffer[xp][yp]) {
+      int arr_index = get_index(xp, yp);
+
+      //if (ooz > zbuffer[xp][yp]) { zbuffer[xp][yp] = ooz; output[xp][yp] = {1, L}; }
+
+      if (ooz > ooz_data[arr_index]) { ooz_data[arr_index] = ooz; L_data[arr_index] = L; }
+      /*if(ooz > zbuffer[xp][yp]) {
         zbuffer[xp][yp] = ooz;
         float luminance_index = L;
         curr_tag.luminance = luminance_index;
         output[xp][yp] = curr_tag;
-      }
+      }*/
     }
   }
+
+  write_to_z_buffer_and_output(ooz_data, L_data);
+
+  delete [] ooz_data; delete [] L_data;
 }
 
 void draw_sphere (float A, float B, color_tag (&output)[SCREEN_HEIGHT][SCREEN_WIDTH], float (&zbuffer)[SCREEN_HEIGHT][SCREEN_WIDTH])
@@ -220,111 +260,127 @@ void draw_sphere (float A, float B, color_tag (&output)[SCREEN_HEIGHT][SCREEN_WI
   }
 }
 
-void draw_prism (float A, float B, color_tag (&output)[SCREEN_HEIGHT][SCREEN_WIDTH], float (&zbuffer)[SCREEN_HEIGHT][SCREEN_WIDTH]) {
-  float width = 3;
-  float height = 3;
-  float depth = 3;
+void draw_prism (float A, float B, float width=3, float height=3, float depth=3) {
+  auto ooz_data = new float[SCREEN_WIDTH * SCREEN_HEIGHT]();
+  auto L_data = new float[SCREEN_WIDTH * SCREEN_HEIGHT]();
 
   for (float x = 0; x < width; x += prism_spacing) {
     for (float y = 0; y < height; y += prism_spacing) {
-        vec3 side1_front = { x, y, 0 };
-        vec3 side1_back = { x, y, depth };
+      vec3 side1_front = { x, y, 0 };
+      vec3 side1_back = { x, y, depth };
 
-        vec3 light = (vec3) {0, 1, -1};
-        light.normalize();
+      vec3 light = (vec3) {0, 1, -1};
+      light.normalize();
 
-        vec3 side2_left = (vec3) {0, y, (x/width) * depth};
-        vec3 side2_right = side2_left + (vec3) {width, 0, 0};
+      vec3 side2_left = (vec3) {0, y, (x/width) * depth};
+      vec3 side2_right = side2_left + (vec3) {width, 0, 0};
 
-        vec3 side3_bottom = (vec3) {x, 0, (y/height)*depth};
-        vec3 side3_top = side3_bottom + (vec3) {0, height, 0};
+      vec3 side3_bottom = (vec3) {x, 0, (y/height)*depth};
+      vec3 side3_top = side3_bottom + (vec3) {0, height, 0};
 
-        vec3 curr_points[6] = { side1_front, side1_back, side2_left, side2_right, side3_bottom, side3_top };
+      vec3 curr_points[6] = { side1_front, side1_back, side2_left, side2_right, side3_bottom, side3_top };
 
-        matrix3 matrix_two = matrix3('x', A);
-        matrix3 matrix_three = matrix3 ('z', B);
+      matrix3 matrix_two = matrix3('x', A);
+      matrix3 matrix_three = matrix3 ('z', B);
 
-        for (int i = 0; i < 6; i++) {
-          vec3 transformed_pos = curr_points[i];
-          transformed_pos = transformed_pos * matrix_two * matrix_three;
-          transformed_pos = transformed_pos + (vec3) {0, 0, K2};
+      for (int i = 0; i < 6; i++) {
+        vec3 transformed_pos = curr_points[i] - (vec3) {width/2, height/2, depth/2};
+        transformed_pos = transformed_pos * matrix_two * matrix_three;
+        transformed_pos = transformed_pos + (vec3) {0, 0, K2};
 
-          vec3 normal; 
-          switch (i) 
-          {
-            case 0: 
-              normal = {0, 0, -1};
-            break;
-            case 1:
-              normal = {0, 0, 1};
-            break;
-            case 2:
-              normal = {-1, 0, 0};
-            break;
-            case 3:
-              normal = {1, 0, 0};
-            break;
-            case 4:
-              normal = {0, -1, 0};
-            break;
-            case 5:
-              normal = {0, 1, 0};
-            break;
-          }
-          normal = normal * matrix_two * matrix_three;
-          normal.normalize();
-
-          float ooz = 1/transformed_pos.z;
-          int xp = (int) (SCREEN_WIDTH/2 + K1*ooz*transformed_pos.x);
-          int yp = (int) (SCREEN_HEIGHT/2 - K1*ooz*transformed_pos.y);
-          if (xp >= SCREEN_WIDTH) xp = SCREEN_WIDTH - 1;
-          else if (xp < 0) xp = 0;
-          if (yp < 0) yp = 0;
-          else if  (yp >= SCREEN_HEIGHT) yp = SCREEN_HEIGHT - 1;
-          
-          float L = normal * light;
-          if (L < 0) L = 0;
-
-          if (ooz > zbuffer[xp][yp]) {
-            zbuffer[xp][yp] = ooz;
-            float luminance_index = L;
-            color_tag curr_tag = { i, 0 };
-            curr_tag.luminance = luminance_index;
-            output[xp][yp] = curr_tag;
-          }
+        vec3 normal; 
+        switch (i) 
+        {
+          case 0: 
+            normal = {0, 0, -1};
+          break;
+          case 1:
+            normal = {0, 0, 1};
+          break;
+          case 2:
+            normal = {-1, 0, 0};
+          break;
+          case 3:
+            normal = {1, 0, 0};
+          break;
+          case 4:
+            normal = {0, -1, 0};
+          break;
+          case 5:
+            normal = {0, 1, 0};
+          break;
         }
+        normal = normal * matrix_two * matrix_three;
+        normal.normalize();
+
+        float ooz = 1/transformed_pos.z;
+        int xp = (int) (SCREEN_WIDTH/2 + K1*ooz*transformed_pos.x);
+        int yp = (int) (SCREEN_HEIGHT/2 - K1*ooz*transformed_pos.y);
+        if (xp >= SCREEN_WIDTH) xp = SCREEN_WIDTH - 1;
+        else if (xp < 0) xp = 0;
+        if (yp < 0) yp = 0;
+        else if  (yp >= SCREEN_HEIGHT) yp = SCREEN_HEIGHT - 1;
+        
+        float L = normal * light;
+        if (L < 0) L = 0;
+
+        int arr_index = get_index(xp, yp);
+
+        if (ooz > ooz_data[arr_index]) { ooz_data[arr_index] = ooz; L_data[arr_index] = L; }
+        /*if (ooz > zbuffer[xp][yp]) {
+          zbuffer[xp][yp] = ooz;
+          float luminance_index = L;
+          color_tag curr_tag = { i, 0 };
+          curr_tag.luminance = luminance_index;
+          output[xp][yp] = curr_tag;
+        }*/
+      }
     }
   }
+  write_to_z_buffer_and_output(ooz_data, L_data);
+
+  delete [] ooz_data; delete [] L_data;
 }
 
 void render_frame (float A, float B, float temp_value)
 {
-  color_tag output[SCREEN_WIDTH][SCREEN_HEIGHT] = { 0, 0 };
-  float zbuffer[SCREEN_WIDTH][SCREEN_HEIGHT] = { 0 };
+  //std::thread t1(draw_donut, A, B, temp_value * 3);
+  std::thread t2(draw_prism, A, B, 2 + temp_value*3, 2+temp_value*3, 2+temp_value*3);
+  //std::thread t2(draw_donut, A + 10, B + 10, temp_value + 3);
+  //std::thread t3(draw_donut, A, B, temp_value + 2);
+  //std::thread t4(draw_donut, A + 15, B + 15, temp_value/2);
+  //std::thread t5(draw_donut, A + 12, B + 18, temp_value/2);
+  //std::thread t6(draw_donut, A + 10, B + 15, temp_value/2);
+  //std::thread t7(draw_donut, A + 5, B + 15, temp_value/2);
+  //std::thread t8(draw_donut, A + 15, B + 5, temp_value/2);
 
-  draw_donut (A, B, temp_value, output, zbuffer);
-  //draw_donut (A + 5, B + 5, output, zbuffer);
-  //draw_sphere (A, B, output, zbuffer);
-  //draw_donut (A + 10, B + 10, output, zbuffer);
-  //draw_donut (A + 15, B + 15, output, zbuffer);
-  //draw_donut (A + 20, B + 20, output, zbuffer);
+  //t1.join();
+  t2.join();
+  //t3.join();
+  //t4.join();
+  //t5.join();
+  //t6.join();
+  //t7.join();
+  //t8.join();
 
-  //draw_prism (A+5, B+5, output, zbuffer);
-  //draw_prism (A+10, B+10, output, zbuffer);
-  //draw_prism (A, B, output, zbuffer);
+  
 
   printf("\x1b[H");
-  for (int j = 0; j < SCREEN_HEIGHT; j++) {
-    for (int i = 0; i < SCREEN_WIDTH; i++) {
-      color_tag curr_tag = output[i][j];
+  for (int x = 0; x < SCREEN_WIDTH; x++) {
+    for (int y = 0; y < SCREEN_HEIGHT; y++) {
+      color_tag curr_tag = output[x][y];
       float brightness = curr_tag.luminance;
       int type = curr_tag.type;
 
-      //printf ("\x1b[48;2;%d;%d;%dm%s", (int) (brightness * 0x74), (int) (brightness * 0xD7), (int) (brightness * 0xEC), print_char);
-      if (type == 0 || type == 1) printf ("\x1b[48;2;%d;%d;%dm%s", (int) (brightness * 0x74), (int) (brightness * 0xD7), (int) (brightness * 0xEC), print_char);
-      else if (type == 2 || type == 3) printf ("\x1b[48;2;%d;%d;%dm%s", (int) (brightness * 0x74), (int) (brightness * 0x00), (int) (brightness * 0xEC), print_char);
-      else if (type == 4 || type == 5) printf ("\x1b[48;2;%d;%d;%dm%s", (int) (brightness * 0xFF), (int) (brightness * 0xFF), (int) (brightness * 0xEC), print_char);
-      else printf ("\x1b[48;2;%d;%d;%dm%s", (int) (brightness * 0xFF), (int) (brightness * 0x00), (int) (brightness * 0x00), print_char);
+      printf ("\x1b[48;2;%d;%d;%dm%s", (int) (brightness * 0x74), (int) (brightness * 0xD7), (int) (brightness * 0xEC), print_char);
+
+      zbuffer[x][y] = 0;   // put this in same loop to increase performance
+      output[x][y] = {0, 0};
+
+      //if (type == 0 || type == 1) printf ("\x1b[48;2;%d;%d;%dm%s", (int) (brightness * 0x74), (int) (brightness * 0xD7), (int) (brightness * 0xEC), print_char);
+      //else if (type == 2 || type == 3) printf ("\x1b[48;2;%d;%d;%dm%s", (int) (brightness * 0x74), (int) (brightness * 0x00), (int) (brightness * 0xEC), print_char);
+      //else if (type == 4 || type == 5) printf ("\x1b[48;2;%d;%d;%dm%s", (int) (brightness * 0xFF), (int) (brightness * 0xFF), (int) (brightness * 0xEC), print_char);
+      //else printf ("\x1b[48;2;%d;%d;%dm%s", (int) (brightness * 0xFF), (int) (brightness * 0x00), (int) (brightness * 0x00), print_char);
       /*switch (type)
       {
         case 3:
