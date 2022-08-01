@@ -5,6 +5,7 @@
 #endif
 #include <stdint.h>
 #include <fftw3.h>
+#include <vector>
 
 struct wava_plan {
 	int fft_buffer_size;
@@ -37,8 +38,9 @@ struct wava_plan {
 	int lower_cut_off; // ?
 	int upper_cut_off; // ?
 
-	double band_lower_cutoff_freq[10] = {20, 300, 2100, 435/*A*/, 488/*B*/, 518/*C*/, 583/*D*/, 654/*E*/, 693/*F*/, 778/*G*/};
-	double band_upper_cutoff_freq[10] = {250, 2000, 10000, 445, 498, 528, 593, 664, 703, 788};
+	double band_lower_cutoff_freq[10] = {20, 200, 1000, 435/*A*/, 485/*B*/, 518/*C*/, 583/*D*/, 654/*E*/, 693/*F*/, 778/*G*/};
+	double band_upper_cutoff_freq[10] = {150, 450, 2000, 445, 500, 528, 593, 664, 703, 788};
+	double band_octaves_count[10] = { 0, 0, 0, 3, 3, 3, 3, 3, 3, 3 };
 
 	int screen_x;
 	int screen_y;
@@ -50,8 +52,7 @@ struct wava_plan* wava_init(int frequency_bands, unsigned int rate, int channels
 
 
 
-void wava_execute(double* wava_in, int new_samples, double* wava_out, 
-				struct wava_plan* plan);
+std::vector<double> wava_execute(double* wava_in, int new_samples, struct wava_plan* plan);
 
 void wava_destroy(struct wava_plan* plan);
 

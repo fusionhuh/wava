@@ -27,23 +27,9 @@
 #ifndef PI
 #define PI 3.14159265359
 #endif
-#define THETA_SPACING 0.041
-#define PHI_SPACING 0.041
+#define THETA_SPACING 0.04
+#define PHI_SPACING 0.04
 #define PRISM_SPACING 0.041
-
-struct vecx // dynamic length vector, used for weighting functions
-{
-	std::vector<float> components;
-
-	void normalize();
-
-	float operator*(const vecx vec);
-
-	vecx();
-	vecx(std::vector<float>);
-
-	void destroy();
-};
 
 struct vec3
 {
@@ -66,25 +52,6 @@ struct vec3
     void print_coord (); // debugging
 };
 
-struct wava_screen {
-	int x_dim; int y_dim;
-	double* zbuffer;
-	ColorTag* output;
-	std::mutex mtx;
-
-	static vec3 light;
-
-	static float light_smoothness;
-
-	wava_screen(int x, int y);
-
-	int get_index(int x_coord, int y_coord);
-
-	void write_to_z_buffer_and_output(const float* zbuf_data, const ColorTag* output_data); // data length is assumed to be correct
-
-	void destroy();
-};
-
 struct matrix3
 {
   vec3 col_one;
@@ -98,12 +65,9 @@ struct matrix3
 
 vec3 operator*(vec3 vec, matrix3 mat);
 
-void draw_donut (const Donut donut, wava_screen* screen, const std::vector<float> weighting_coefficients, const float A, const float B);
+void normalize_vector(std::vector<double>& vec);
 
-void draw_sphere (const Sphere sphere, wava_screen* screen, const std::vector<float> weighting_coefficients, const float A, const float B);
-
-void draw_rect_prism (const RectPrism rect_prism, wava_screen* screen, const std::vector<float> weighting_coefficients, const float A, const float B);
-
+double operator*(std::vector<double> vec1, std::vector<double> vec2);
 
 // shapes/colors portion
 struct Color {
@@ -112,6 +76,12 @@ struct Color {
 	Color();
 	Color(uint8_t r, uint8_t g, uint8_t b);
 };
+
+Color operator+(const Color color1, const Color color2);
+
+Color operator*(const double scalar, const Color color);
+
+bool operator==(const Color color1, const Color color2);
 
 struct ColorTag {
     Color color;
@@ -136,6 +106,8 @@ struct Shape {
 	int x_offset;
 	int y_offset;
 
+	std::vector<double> luminance_weighting_function;
+
 	virtual int get_shape_type();
 };
 
@@ -156,7 +128,7 @@ struct Sphere : public Shape {
 
 struct Donut : public Shape {
 	float radius, thickness;
-	vecx radius_weighting_function, thickness_weighting_function;
+	std::vector<double> radius_weighting_function, thickness_weighting_function;
 
 	int get_shape_type();
 };
@@ -191,6 +163,35 @@ struct Triangle : public Shape {
 	int get_shape_type();
 };
 
+struct wava_screen {
+	int x_dim; int y_dim;
+	double* zbuffer;
+	ColorTag* output;
+	std::mutex mtx;
+
+	ColorPalette bg_palette; 
+
+	static vec3 light;
+
+	static float light_smoothness;
+
+	wava_screen(int x, int y);
+
+	int get_index(int x_coord, int y_coord);
+
+	void write_to_z_buffer_and_output(const float* zbuf_data, const ColorTag* output_data); // data length is assumed to be correct
+
+	void destroy();
+};
+
+void draw_donut (const Donut donut, wava_screen* screen, const std::vector<double> wava_out, const float A, const float B);
+
+void draw_sphere (const Sphere sphere, wava_screen* screen, const std::vector<double> weighting_coefficients, const float A, const float B);
+
+void draw_rect_prism (const RectPrism rect_prism, wava_screen* screen, const std::vector<double> weighting_coefficients, const float A, const float B);
+
 std::vector<Shape*> generate_rand_shapes(int count, float variance, int freq_bands);
+
+ColorPalette generate_rand_palette();
 
 #endif

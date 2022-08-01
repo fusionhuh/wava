@@ -1,17 +1,17 @@
 #include <thread>
 #include "cli.h"
 
-void render_cli_frame (std::vector<Shape*> shapes, wava_screen* screen, double* wava_out) {
+void render_cli_frame (std::vector<Shape*> shapes, wava_screen* screen, std::vector<double> wava_out) {
     static int time = 0;
     std::vector<std::thread> threads; 
-    std::vector<float> weighting;
+    std::vector<double> weighting;
     for (int i = 0; i < shapes.size(); i++) {
         switch(shapes[i]->get_shape_type()) {
             case DONUT_SHAPE:
                 {
                 Donut* donut = (Donut*) shapes[i];
-                
-                std::thread donut_thread(draw_donut, *donut, screen, weighting, 0 + time * 0.01, 5 + time * 0.01);
+
+                std::thread donut_thread(draw_donut, *donut, screen, wava_out, 0 + time * 0.005, 5 + time * 0.005);
                 threads.push_back(std::move(donut_thread));
                 }
             break;
@@ -59,8 +59,16 @@ void render_cli_frame (std::vector<Shape*> shapes, wava_screen* screen, double* 
                 //printf("luminance is %f\n", luminance);
             }
 
-            //if(brightness < 0.01) brightness=(wava_out[3]/60);
-            printf ("\x1b[38;2;%d;%d;%dm%s", (int) (luminance * color.r), (int) (luminance * color.g), (int) (luminance * color.b), "@@");
+            if(luminance <= 0 && (color == Color(0, 0, 0))) { 
+                for (int i = 0; i < 7; i++) {
+                    color = wava_out[i + 3] * screen->bg_palette.colors[i % screen->bg_palette.colors.size()] + color;
+                }
+                //for (int i = 0; i < screen->bg_palette.colors.size(); i++) {
+                //    color = wava_out[i + 3] * screen->bg_palette.colors[i] + color;
+                //}
+                luminance = 1;
+            }
+            printf ("\x1b[48;2;%d;%d;%dm%s", (int) (luminance * color.r), (int) (luminance * color.g), (int) (luminance * color.b), "  ");
 
             screen->zbuffer[curr_index] = 0;   // put this in same loop to increase performance
             screen->output[curr_index].luminance = 0;

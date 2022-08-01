@@ -27,6 +27,19 @@ Color::Color(uint8_t r, uint8_t g, uint8_t b) {
 	Color::b = b;
 }
 
+Color operator+(const Color color1, const Color color2) {
+    return Color(color1.r + color2.r, color1.g + color2.g, color1.b + color2.b);
+}
+
+Color operator*(const double scalar, const Color color) {
+    return Color(color.r * scalar, color.g * scalar, color.b * scalar);
+}
+
+bool operator==(const Color color1, const Color color2) {
+    if (color1.r == color2.r && color1.g == color2.g && color1.b == color2.b) return true;
+    else return false;
+}
+
 ColorTag::ColorTag() {}
 ColorTag::ColorTag(Color color, float luminance) { this->color = color; this->luminance = luminance; }
 
@@ -69,6 +82,22 @@ ColorPalette generate_rand_palette() {
     return palette;
 }
 
+void normalize_vector(std::vector<double>& vec) {
+	double magnitude = 0.0000001;
+	for (int i = 0; i < vec.size(); i++) magnitude+=vec[i]*vec[i];
+	magnitude = sqrt(magnitude);
+	for (int i = 0; i < vec.size(); i++) vec[i]/=magnitude;
+}
+
+double operator*(std::vector<double> vec1, std::vector<double> vec2) {
+	if (vec1.size() != vec2.size()) { fputs("Invalid vector dimensions for dot product.\n", stderr); exit(-1); }
+	double dot = 0;
+	for (int i = 0; i < vec1.size(); i++) {
+		dot+=vec1[i] * vec2[i];
+	}
+	return dot;
+}
+
 std::vector<Shape*> generate_rand_shapes(const int count, const float variance, const int freq_bands) {
     std::vector<Shape*> shapes;
     for (int i = 0; i < count; ++i) {
@@ -103,12 +132,22 @@ std::vector<Shape*> generate_rand_shapes(const int count, const float variance, 
             case DONUT_SHAPE:
             {
                 Donut* donut = new Donut();
-                donut->radius = 1.3;
-                donut->thickness = 0.5;
+                donut->radius = 1;
+                donut->thickness = 0.25;
 
-                donut->base_luminance = 1.1;
+                donut->base_luminance = 2;
 
                 donut->palette = generate_rand_palette();
+
+                donut->radius_weighting_function = std::vector<double>(freq_bands);
+                donut->radius_weighting_function[0] = 1;
+                normalize_vector(donut->radius_weighting_function);
+                donut->thickness_weighting_function = std::vector<double>(freq_bands);
+                //donut->thickness_weighting_function[9] = 2;
+                normalize_vector(donut->thickness_weighting_function);
+                donut->luminance_weighting_function = std::vector<double>(freq_bands);
+                //donut->luminance_weighting_function[0] = 2;
+                normalize_vector(donut->luminance_weighting_function);
 
                 shapes.push_back(donut);
             }
@@ -121,35 +160,6 @@ std::vector<Shape*> generate_rand_shapes(const int count, const float variance, 
     }
 
     return shapes;
-}
-
-void vecx::normalize() {
-    float magnitude = 0;
-    for (int i = 0; i < components.size(); i++) {
-        magnitude+=components[i]*components[i];
-    }
-    sqrt(magnitude);
-
-    for (int i = 0; i < components.size(); i++) {
-        components[i]/=magnitude;
-    }
-}
-
-float vecx::operator*(const vecx other) {
-    if (other.components.size() != components.size()) {
-        fputs("Invalid vecx dimensions for dot product.", stderr);
-        return -1;
-    }
-
-    float total = 0;
-    for (int i = 0; i < components.size(); i++) {
-        total+=components[i]*other.components[i];
-    }
-    return total;
-}
-
-vecx::vecx(std::vector<float> components) {
-    this->components = components;
 }
 
 vec3 vec3::operator+(const vec3& vec) { return { this->x + vec.x, this->y + vec.y, this->z + vec.z }; }
@@ -165,10 +175,10 @@ float vec3::operator*(const vec3& vec) { return (this->x * vec.x + this->y * vec
 float vec3::magnitude() { return sqrt (this->x * this->x + this->y * this->y + this->z * this->z); }; 
 
 void vec3::normalize() { 
-    float magnitude = this->magnitude();
-    this->x = this->x/magnitude;
-    this->y = this->y/magnitude;
-    this->z = this->z/magnitude;
+    float magnitude_inverse = 1/this->magnitude();
+    this->x = this->x*magnitude_inverse;
+    this->y = this->y*magnitude_inverse;
+    this->z = this->z*magnitude_inverse;
 }
 
 vec3 vec3::operator^(const vec3& vec) { // cross
@@ -240,8 +250,16 @@ void wava_screen::write_to_z_buffer_and_output(const float* zbuf_data, const Col
 
 vec3 operator*(vec3 vec, matrix3 mat) { return { vec * mat.col_one, vec * mat.col_two, vec * mat.col_three }; }
 
-void draw_donut (const Donut donut, wava_screen* screen, const std::vector<float> weighting_coefficients, const float A, const float B) {
-    float radius = donut.radius, thickness = donut.thickness;
+void draw_donut (const Donut donut, wava_screen* screen, const std::vector<double> wava_out, const float A, const float B) {
+    float radius = donut.radius, thickness = donut.thickness, luminance = donut.base_luminance;
+    double radius_increase = donut.radius_weighting_function * wava_out * 0.5;
+    double thickness_increase = donut.thickness_weighting_function * wava_out;
+    double luminance_increase = donut.luminance_weighting_function * wava_out * 2;
+    radius*=(radius_increase + 1)*(radius_increase+1);
+    thickness*=(thickness_increase + 1);
+    luminance*=(luminance_increase + 1);
+    
+    printf("radius_increase: %f thickness_increase: %f luminance_increase: %f\n", radius_increase, thickness_increase, luminance_increase);
 
     float* ooz_data = new float[screen->x_dim * screen->y_dim]();
     ColorTag* output_data = new ColorTag[screen->x_dim * screen->y_dim]();
@@ -250,6 +268,7 @@ void draw_donut (const Donut donut, wava_screen* screen, const std::vector<float
 
     ColorTag curr_tag;
 
+    float log2_inverse = 1/log(2.0);
     for (float theta=0; theta < 2*PI; theta += THETA_SPACING) {
         for (float phi=0; phi < 2*PI; phi += PHI_SPACING) {
             vec3 pos = { radius + thickness * cos(theta) + 1, thickness * sin(theta), 0.0000000001 }; // setting z to small num to avoid NaN with 1/z
@@ -260,8 +279,8 @@ void draw_donut (const Donut donut, wava_screen* screen, const std::vector<float
             transformed_pos.z += K2;
             float ooz = 1/transformed_pos.z;
     
-            int xp = (int) (screen->x_dim/2 + K1*ooz*transformed_pos.x);
-            int yp = (int) (screen->y_dim/2 - K1*ooz*transformed_pos.y);
+            int xp = (int) (screen->x_dim*0.5 + K1*ooz*transformed_pos.x);
+            int yp = (int) (screen->y_dim*0.5 - K1*ooz*transformed_pos.y);
             if (xp >= screen->x_dim) xp = screen->x_dim - 1; // checking to see if projected coord is out of screen bounds
             else if (xp < 0) xp = 0;
             if (yp < 0) yp = 0;
@@ -272,7 +291,7 @@ void draw_donut (const Donut donut, wava_screen* screen, const std::vector<float
 
             float L = (normal * screen->light);
 
-            L += (log(donut.base_luminance + 1)/log(2.0)) - 1;
+            L += (log(luminance + 1)*log2_inverse) - 1;
             if (L > 1) L = 1;
             curr_tag.luminance = L;
 
@@ -309,7 +328,7 @@ void draw_donut (const Donut donut, wava_screen* screen, const std::vector<float
     delete [] ooz_data; delete [] output_data;
 }
 
-void draw_sphere (const Sphere sphere, wava_screen* screen, const std::vector<float> weighting_coefficients, const float A, const float B) {
+void draw_sphere (const Sphere sphere, wava_screen* screen, const std::vector<double> weighting_coefficients, const float A, const float B) {
     float radius = sphere.radius;
 
     float* ooz_data = new float[screen->x_dim * screen->y_dim]();
@@ -319,6 +338,7 @@ void draw_sphere (const Sphere sphere, wava_screen* screen, const std::vector<fl
 
     ColorTag curr_tag;
 
+    float log2_inverse = 1/log(2.0);
     for (float theta = 0; theta < 2*PI; theta += THETA_SPACING) {
         for (float phi = 0; phi < 1*PI; phi += PHI_SPACING) {
             vec3 pos = {radius * cos (theta), radius * sin (theta), 0};
@@ -329,8 +349,8 @@ void draw_sphere (const Sphere sphere, wava_screen* screen, const std::vector<fl
             transformed_pos.z += K2;
             float ooz = 1/transformed_pos.z;
 
-            int xp = (int) (screen->x_dim/2 + K1*ooz*transformed_pos.x);
-            int yp = (int) (screen->y_dim/2 - K1*ooz*transformed_pos.y);
+            int xp = (int) (screen->x_dim*0.5 + K1*ooz*transformed_pos.x);
+            int yp = (int) (screen->y_dim*0.5 - K1*ooz*transformed_pos.y);
             if (xp >= screen->x_dim) xp = screen->x_dim - 1;
             else if (xp < 0) xp = 0;
             if (yp < 0) yp = 0;
@@ -341,7 +361,7 @@ void draw_sphere (const Sphere sphere, wava_screen* screen, const std::vector<fl
 
             float L = (normal * screen->light);
 
-            L += (log(sphere.base_luminance + 1)/log(2.0)) - 1;
+            L += (log(sphere.base_luminance + 1)*log2_inverse) - 1;
             if (L > 1) L = 1;
             curr_tag.luminance = L;
 
@@ -378,7 +398,7 @@ void draw_sphere (const Sphere sphere, wava_screen* screen, const std::vector<fl
     delete [] ooz_data; delete [] output_data;
 }
 
-void draw_rect_prism (const RectPrism rect_prism, wava_screen* screen, const std::vector<float> weighting_coefficients, const float A, const float B) {
+void draw_rect_prism (const RectPrism rect_prism, wava_screen* screen, const std::vector<double> weighting_coefficients, const float A, const float B) {
     float width = rect_prism.width;
     float height = rect_prism.height;
     float depth = rect_prism.depth;
@@ -390,6 +410,7 @@ void draw_rect_prism (const RectPrism rect_prism, wava_screen* screen, const std
 
     ColorTag curr_tag;
 
+    float log2_inverse = 1/log(2.0);
     for (float x = 0; x < width; x += PRISM_SPACING) {
         for (float y = 0; y < height; y += PRISM_SPACING) {
             vec3 side1_front = { x, y, 0 };
@@ -442,7 +463,7 @@ void draw_rect_prism (const RectPrism rect_prism, wava_screen* screen, const std
 
                 float L = (normal * screen->light);
 
-                L += (log(rect_prism.base_luminance + 1)/log(2.0)) - 1;
+                L += (log(rect_prism.base_luminance + 1)*log2_inverse) - 1;
                 if (L > 1) L = 1;
                 curr_tag.luminance = L;
 

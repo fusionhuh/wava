@@ -29,17 +29,17 @@
 
 int main(int argc, char **argv)
 {
-	srand(time(0)); // set RNG seed
+	srand(time(0)); // set rand() seed
 	int time = 0;
 
 	// main loop	
 	while (true) {
 		printf ("wava.cpp flag 1\n");
 		// LOAD CONFIG VALUES
-		int freq_bands = 2;
-		std::vector<Shape*> shapes = generate_rand_shapes(2, 0, 0);
+		int freq_bands = 10;
+		std::vector<Shape*> shapes = generate_rand_shapes(1, 0, freq_bands);
 		wava_screen::light.normalize();
-		wava_screen::light_smoothness = 5;
+		wava_screen::light_smoothness = -1;
 		// config values end
 
 		struct audio_data audio;
@@ -77,25 +77,25 @@ int main(int argc, char **argv)
 			int curr_screen_x = 50; 
 			int curr_screen_y = 50; // could be changed in next loop
 
-			struct wava_plan* plan = wava_init(10, 44100, 2, 0.77, 50, 10000);
-			double* wava_out = new double[plan->frequency_bands]();
+			struct wava_plan* plan = wava_init(freq_bands, 44100, 2, 0.77, 50, 10000);
 
 			wava_screen* screen = new wava_screen(curr_screen_x, curr_screen_y);
+			screen->bg_palette = generate_rand_palette();
 
 			while (true) { // while (!resizeTerminal)
 				pthread_mutex_lock(&audio.lock);
-				wava_execute(audio.wava_in, audio.samples_counter, wava_out, plan);
+				std::vector<double> wava_out = wava_execute(audio.wava_in, audio.samples_counter, plan);
+				normalize_vector(wava_out);
 				if (audio.samples_counter > 0) audio.samples_counter = 0;
 				pthread_mutex_unlock(&audio.lock);
 				render_cli_frame(shapes, screen, wava_out);
-				usleep(5000);
+				//printf("base is: %f mid is: %f treble is: %f\n", wava_out[0] * 1.25, wava_out[1], wava_out[2]);
+				//usleep(20000); // should correspond to ~30 FPS
 				time+=1;        
 			}	
 
 		    wava_destroy(plan);
 			free(plan);
-
-			delete [] wava_out; // not sure if this belongs in this scope
 
 			screen->destroy();
 			delete screen;

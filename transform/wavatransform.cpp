@@ -22,7 +22,7 @@ struct wava_plan* wava_init(int frequency_bands, unsigned int rate, int channels
 	// error checks placed here
 
 	plan->rate = rate;
-	plan->freq_bin_size = (plan->rate/2) / ( (8192/2) - 1);
+	plan->freq_bin_size = (plan->rate/2)/(8192/2);
 
 	plan->frequency_bands = frequency_bands;
 	plan->audio_channels = channels;
@@ -60,7 +60,7 @@ struct wava_plan* wava_init(int frequency_bands, unsigned int rate, int channels
 	return plan;
 }
 
-void wava_execute(double* wava_in, int new_samples, double* wava_out, struct wava_plan* plan) {
+std::vector<double> wava_execute(double* wava_in, int new_samples, struct wava_plan* plan) {
 	
 	// do not overflow
 	if (new_samples > plan->input_buffer_size) {
@@ -111,9 +111,14 @@ void wava_execute(double* wava_in, int new_samples, double* wava_out, struct wav
 	fftw_execute(plan->plan_left);
 	if (plan->audio_channels == 2) fftw_execute(plan->plan_right);
 
+
+	std::vector<double> wava_out = std::vector<double>(plan->frequency_bands);
+
+	double inverse = 1/8192;
 	for (int a = 0; a < plan->frequency_bands; a++) {
 		int band_lower_cutoff = plan->band_lower_cutoff_freq[a];
 		int band_upper_cutoff = plan->band_upper_cutoff_freq[a];
+		int center_frequency = (band_lower_cutoff + band_upper_cutoff)/2;
 
 		// just going to handle left ("main") channel for now
 		int start_index = band_lower_cutoff / plan->freq_bin_size;
@@ -122,11 +127,26 @@ void wava_execute(double* wava_in, int new_samples, double* wava_out, struct wav
 		double curr_band_sum_l = 0;
 
 		for (int b = start_index; b <= end_index; b++) {
-			curr_band_sum_l += hypot(plan->l_output_data[b][0], plan->l_output_data[b][1]);	
+			double magnitude = hypot(plan->l_output_data[b][0], plan->l_output_data[b][1])*inverse; // normalize by sample count
+			curr_band_sum_l += (magnitude > 100) ? (magnitude - 100) * 1.5 : 0; 
+			//curr_band_sum_l += magnitude;
+			//if (magnitude > 200) printf("curr_magnitude is: %f\n", magnitude);
+		}
+		for (int octave = 0; octave < plan->band_octaves_count[a]; octave++) {
+			center_frequency*=2; // bitshifting left to multiply by pow(2, octave);
+			band_lower_cutoff+=5;
+			band_upper_cutoff+=5;
+
+			start_index = band_lower_cutoff / plan->freq_bin_size;
+			end_index = band_upper_cutoff / plan->freq_bin_size;
+
+			
 		}
 
-		wava_out[a] = curr_band_sum_l/((band_upper_cutoff - band_lower_cutoff)*plan->rate); 
+		wava_out[a] = (curr_band_sum_l/((band_upper_cutoff - band_lower_cutoff)));
 	}
+
+	return wava_out;
 }
 
 void wava_destroy(struct wava_plan* plan) {
