@@ -100,6 +100,7 @@ struct ColorPalette {
 
 struct Shape {
 	ColorPalette palette;
+	Color calculate_corresponding_color(float normalized_val /*decimal number ranging from 0 to 1*/);
 
 	float base_luminance;
 	float velocity; // rate of translational movement
@@ -164,31 +165,39 @@ struct Triangle : public Shape {
 };
 
 struct wava_screen {
-	int x_dim; int y_dim;
-	double* zbuffer;
-	ColorTag* output;
-	std::mutex mtx;
+	private:
+		int x, y;
+		std::mutex mtx; 
 
-	ColorPalette bg_palette; 
+		float K1, K2, R1, R2;
 
-	static vec3 light;
+	public:
+		static vec3 light;
+		static float light_smoothness;
 
-	static float light_smoothness;
+		ColorPalette bg_palette;
 
-	wava_screen(int x, int y);
+		wava_screen(int x, int y);
 
-	int get_index(int x_coord, int y_coord);
+		int x_dim();
+		int y_dim();
+	
+		std::vector<double> zbuffer;
+		std::vector<ColorTag> output;
 
-	void write_to_z_buffer_and_output(const float* zbuf_data, const ColorTag* output_data); // data length is assumed to be correct
+		int get_index(int x_coord, int y_coord);
 
-	void destroy();
+		std::tuple<int, int, float> calculate_proj_coord(vec3 pos);
+
+		void write_to_z_buffer_and_output(const float* zbuffer, const ColorTag* output); // data length is assumed to be correct
+
 };
 
-void draw_donut (const Donut donut, wava_screen* screen, const std::vector<double> wava_out, const float A, const float B);
+void draw_donut (Donut donut, wava_screen &screen, std::vector<double> wava_out, float A, float B);
 
-void draw_sphere (const Sphere sphere, wava_screen* screen, const std::vector<double> weighting_coefficients, const float A, const float B);
+void draw_sphere (Sphere sphere, wava_screen &screen, std::vector<double> weighting_coefficients, float A, float B);
 
-void draw_rect_prism (const RectPrism rect_prism, wava_screen* screen, const std::vector<double> weighting_coefficients, const float A, const float B);
+void draw_rect_prism (RectPrism rect_prism, wava_screen &screen, std::vector<double> weighting_coefficients, float A, float B);
 
 std::vector<Shape*> generate_rand_shapes(int count, float variance, int freq_bands);
 

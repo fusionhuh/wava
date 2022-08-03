@@ -8,17 +8,7 @@
 
 // Based HEAVILY on: https://www.a1k0n.net/2011/07/20/donut-math.html
 
-const float R1 = 0.5;
-const float R2 = 2;
 
-const float K2 = 15;
-// Calculate K1 based on screen size: the maximum x-distance occurs
-// roughly at the edge of the torus, which is at x=R1+R2, z=0.  we
-// want that to be displaced 3/8ths of the width of the screen, which
-// is 3/4th of the way from the center to the side of the screen.
-//SCREEN_WIDTH*3/8 = K1*(R1+R2)/(K2+0)
-//SCREEN_WIDTH*K2*3/(8*(R1+R2)) = K1
-const float K1 = 50*K2*3/(8*(R1+R2)); // need to update to use wava_screen values
 
 Color::Color() {}
 Color::Color(uint8_t r, uint8_t g, uint8_t b) {
@@ -42,6 +32,27 @@ bool operator==(const Color color1, const Color color2) {
 
 ColorTag::ColorTag() {}
 ColorTag::ColorTag(Color color, float luminance) { this->color = color; this->luminance = luminance; }
+
+Color Shape::calculate_corresponding_color(float normalized_val) {
+    int palette_size = palette.colors.size();
+    Color color;
+
+    if (palette.symmetric) {
+        int palette_index = normalized_val * (palette_size + ((int) ((palette_size/2) + 1)));
+        if (palette_index == (palette_size + ((int) (palette_size/2) + 1))) palette_index--;
+        if (palette_index >= palette_size) palette_index -= palette_size;
+
+        color = palette.colors[palette_index];
+    }
+    else {
+        int palette_index = normalized_val * (palette_size);
+        if (palette_index == palette_size) palette_index--;
+
+        color = palette.colors[palette_index];
+    }
+
+    return color;
+}
 
 int Shape::get_shape_type() { return 0; }
 int TriPrism::get_shape_type() { return TRI_PRISM_SHAPE; }
@@ -163,15 +174,10 @@ std::vector<Shape*> generate_rand_shapes(const int count, const float variance, 
 }
 
 vec3 vec3::operator+(const vec3& vec) { return { this->x + vec.x, this->y + vec.y, this->z + vec.z }; }
-
 vec3 vec3::operator-(const vec3& vec) { return { this->x - vec.x, this->y - vec.y, this->z - vec.z }; } // vector sub
-
 vec3 vec3::operator*(const float& scalar) { return { this->x * scalar, this->y * scalar, this->z * scalar  }; } // scalar mult
-
 vec3 vec3::operator/(const float& scalar) { return { this->x / scalar, this->y / scalar, this->z / scalar }; } // scalar div
-
 float vec3::operator*(const vec3& vec) { return (this->x * vec.x + this->y * vec.y + this->z * vec.z); } // dot
-
 float vec3::magnitude() { return sqrt (this->x * this->x + this->y * this->y + this->z * this->z); }; 
 
 void vec3::normalize() { 
@@ -214,34 +220,61 @@ matrix3::matrix3(const char type, float theta = 0, float phi = 0) {
 }
 
 vec3 wava_screen::light = (vec3) {1, 0, -1};
-
 float wava_screen::light_smoothness = -1;
 
 wava_screen::wava_screen(int x, int y) {
-	zbuffer = new double[x*y]();
-	output = new ColorTag[x*y];
+	zbuffer = std::vector<double>(x * y);
+	output = std::vector<ColorTag>(x * y);
 
-    this->x_dim = x;
-    this->y_dim = y;
+    light.normalize();
+
+    this->x = x;
+    this->y = y;
+
+    R1 = 0.5;
+    R2 = 2;
+
+    K2 = 15;
+    // Calculate K1 based on screen size: the maximum x-distance occurs
+    // roughly at the edge of the torus, which is at x=R1+R2, z=0.  we
+    // want that to be displaced 3/8ths of the width of the screen, which
+    // is 3/4th of the way from the center to the side of the screen.
+    //SCREEN_WIDTH*3/8 = K1*(R1+R2)/(K2+0)
+    //SCREEN_WIDTH*K2*3/(8*(R1+R2)) = K1
+    K1 = 50*K2*3/(8*(R1+R2)); // need to update to use wava_screen values
+
+    bg_palette = generate_rand_palette();
 }
 
-void wava_screen::destroy() {
-	delete [] zbuffer;
-	delete [] output;
-}
+int wava_screen::x_dim() { return x; }
+int wava_screen::y_dim() { return y; }
 
 int wava_screen::get_index(int curr_x, int curr_y) {
-  return (curr_x*y_dim + curr_y);
+  return (curr_x * y + curr_y);
 }
 
-void wava_screen::write_to_z_buffer_and_output(const float* zbuf_data, const ColorTag* output_data) {
+std::tuple<int, int, float> wava_screen::calculate_proj_coord(vec3 pos) {
+    pos.z += K2;
+    float ooz = 1/pos.z;
+
+    int xp = (x_dim() * 0.5 + K1*ooz*pos.x);
+    int yp = (y_dim() * 0.5 - K1*ooz*pos.y);
+    if (xp >= x_dim()) xp = x_dim() - 1; // checking to see if projected coord is out of screen bounds
+    else if (xp < 0) xp = 0;
+    if (yp < 0) yp = 0;
+    else if  (yp >= y_dim()) yp = y - 1;
+
+    return std::tuple<int, int, float>(xp, yp, ooz);
+}
+
+void wava_screen::write_to_z_buffer_and_output(const float* zbuffer, const ColorTag* output) {
   mtx.lock();
-  for(int x = 0; x < x_dim; x++) {
-    for(int y = 0; y < y_dim; y++) {
+  for(int x = 0; x < x_dim(); x++) {
+    for(int y = 0; y < y_dim(); y++) {
 	  int curr_index = get_index(x,y);
-      if (zbuf_data[curr_index] > zbuffer[curr_index]) {
-        zbuffer[curr_index] = zbuf_data[curr_index];
-        output[curr_index] = output_data[curr_index];
+      if (zbuffer[curr_index] > this->zbuffer[curr_index]) {
+        this->zbuffer[curr_index] = zbuffer[curr_index];
+        this->output[curr_index] = output[curr_index];
       }
     }
   }
@@ -250,19 +283,18 @@ void wava_screen::write_to_z_buffer_and_output(const float* zbuf_data, const Col
 
 vec3 operator*(vec3 vec, matrix3 mat) { return { vec * mat.col_one, vec * mat.col_two, vec * mat.col_three }; }
 
-void draw_donut (const Donut donut, wava_screen* screen, const std::vector<double> wava_out, const float A, const float B) {
+void draw_donut (Donut donut, wava_screen &screen, const std::vector<double> wava_out, const float A, const float B) {
     float radius = donut.radius, thickness = donut.thickness, luminance = donut.base_luminance;
     double radius_increase = donut.radius_weighting_function * wava_out * 0.5;
     double thickness_increase = donut.thickness_weighting_function * wava_out;
     double luminance_increase = donut.luminance_weighting_function * wava_out * 2;
+
     radius*=(radius_increase + 1)*(radius_increase+1);
     thickness*=(thickness_increase + 1);
     luminance*=(luminance_increase + 1);
     
-    printf("radius_increase: %f thickness_increase: %f luminance_increase: %f\n", radius_increase, thickness_increase, luminance_increase);
-
-    float* ooz_data = new float[screen->x_dim * screen->y_dim]();
-    ColorTag* output_data = new ColorTag[screen->x_dim * screen->y_dim]();
+    float* ooz_data = new float[screen.x_dim() * screen.y_dim()]();
+    ColorTag* output_data = new ColorTag[screen.x_dim() * screen.y_dim()]();
 
     matrix3 matrix_x = matrix3 ('x', A), matrix_z = matrix3 ('z', B);
 
@@ -271,25 +303,20 @@ void draw_donut (const Donut donut, wava_screen* screen, const std::vector<doubl
     float log2_inverse = 1/log(2.0);
     for (float theta=0; theta < 2*PI; theta += THETA_SPACING) {
         for (float phi=0; phi < 2*PI; phi += PHI_SPACING) {
-            vec3 pos = { radius + thickness * cos(theta) + 1, thickness * sin(theta), 0.0000000001 }; // setting z to small num to avoid NaN with 1/z
+            vec3 pos = { radius + thickness * cos(theta) + 1, thickness * sin(theta), 0.0001 }; // setting z to small num to avoid NaN with 1/z
 
             matrix3 matrix_y = matrix3 ('y', phi);
 
             vec3 transformed_pos = pos * matrix_y * matrix_x * matrix_z;
-            transformed_pos.z += K2;
-            float ooz = 1/transformed_pos.z;
-    
-            int xp = (int) (screen->x_dim*0.5 + K1*ooz*transformed_pos.x);
-            int yp = (int) (screen->y_dim*0.5 - K1*ooz*transformed_pos.y);
-            if (xp >= screen->x_dim) xp = screen->x_dim - 1; // checking to see if projected coord is out of screen bounds
-            else if (xp < 0) xp = 0;
-            if (yp < 0) yp = 0;
-            else if  (yp >= screen->y_dim) yp = screen->y_dim - 1;
+            
+            std::tuple<int, int, float> coord = screen.calculate_proj_coord(transformed_pos);
+            int xp = std::get<0>(coord), yp = std::get<1>(coord);
+            float ooz = std::get<2>(coord);
 
             vec3 normal = (vec3) {cos (theta), sin (theta), 0} * matrix_y * matrix_x * matrix_z;
             normal.normalize();
 
-            float L = (normal * screen->light);
+            float L = (normal * screen.light);
 
             L += (log(luminance + 1)*log2_inverse) - 1;
             if (L > 1) L = 1;
@@ -301,38 +328,23 @@ void draw_donut (const Donut donut, wava_screen* screen, const std::vector<doubl
             }
             else {
                 float dist_from_center = (thickness * cos(theta) + thickness)/(2 * thickness);
-                int palette_size = donut.palette.colors.size();
-                if (donut.palette.symmetric) {
-                    int palette_index = dist_from_center * (palette_size + ((int) ((palette_size/2) + 1)));
-                    if (palette_index == (palette_size + ((int) (palette_size/2) + 1))) palette_index--;
-                    if (palette_index >= palette_size) palette_index -= palette_size;
-
-                    curr_tag.color = donut.palette.colors[palette_index];
-                }
-                else {
-                    int palette_index = dist_from_center * (palette_size);
-                    if (palette_index == palette_size) palette_index--;
-
-                    curr_tag.color = donut.palette.colors[palette_index];
-                }
+                curr_tag.color = donut.calculate_corresponding_color(dist_from_center);
             }
 
-            //curr_tag.color = Color(200, 255, 255);
-
-            int arr_index = screen->get_index(xp, yp);
+            int arr_index = screen.get_index(xp, yp);
 
             if (ooz > ooz_data[arr_index]) { ooz_data[arr_index] = ooz; output_data[arr_index] = curr_tag; }
         }
     }
-    screen->write_to_z_buffer_and_output(ooz_data, output_data);
+    screen.write_to_z_buffer_and_output(ooz_data, output_data);
     delete [] ooz_data; delete [] output_data;
 }
 
-void draw_sphere (const Sphere sphere, wava_screen* screen, const std::vector<double> weighting_coefficients, const float A, const float B) {
+void draw_sphere (Sphere sphere, wava_screen &screen, const std::vector<double> weighting_coefficients, const float A, const float B) {
     float radius = sphere.radius;
 
-    float* ooz_data = new float[screen->x_dim * screen->y_dim]();
-    ColorTag* output_data = new ColorTag[screen->x_dim * screen->y_dim]();
+    float* ooz_data = new float[screen.x_dim()* screen.y_dim()]();
+    ColorTag* output_data = new ColorTag[screen.x_dim()* screen.y_dim()]();
   
     matrix3 matrix_x = matrix3 ('x', A), matrix_z = matrix3 ('z', B);
 
@@ -341,25 +353,20 @@ void draw_sphere (const Sphere sphere, wava_screen* screen, const std::vector<do
     float log2_inverse = 1/log(2.0);
     for (float theta = 0; theta < 2*PI; theta += THETA_SPACING) {
         for (float phi = 0; phi < 1*PI; phi += PHI_SPACING) {
-            vec3 pos = {radius * cos (theta), radius * sin (theta), 0};
+            vec3 pos = {radius * cos (theta), radius * sin (theta), 0.00000001};
 
             matrix3 matrix_y = matrix3 ('y', phi);
 
             vec3 transformed_pos = pos * matrix_y * matrix_x * matrix_z;
-            transformed_pos.z += K2;
-            float ooz = 1/transformed_pos.z;
 
-            int xp = (int) (screen->x_dim*0.5 + K1*ooz*transformed_pos.x);
-            int yp = (int) (screen->y_dim*0.5 - K1*ooz*transformed_pos.y);
-            if (xp >= screen->x_dim) xp = screen->x_dim - 1;
-            else if (xp < 0) xp = 0;
-            if (yp < 0) yp = 0;
-            else if  (yp >= screen->y_dim) yp = screen->y_dim - 1;
+            std::tuple<int, int, float> coord = screen.calculate_proj_coord(transformed_pos);
+            int xp = std::get<0>(coord), yp = std::get<1>(coord);
+            float ooz = std::get<2>(coord);
 
             vec3 normal = transformed_pos;
             normal.normalize();
 
-            float L = (normal * screen->light);
+            float L = (normal * screen.light);
 
             L += (log(sphere.base_luminance + 1)*log2_inverse) - 1;
             if (L > 1) L = 1;
@@ -371,40 +378,26 @@ void draw_sphere (const Sphere sphere, wava_screen* screen, const std::vector<do
             }
             else {
                 float dist_from_center = (radius * cos(theta)) + radius/2;
-                int palette_size = sphere.palette.colors.size();
-                if (sphere.palette.symmetric) {
-                    int palette_index = dist_from_center * (palette_size + ((int) ((palette_size/2) + 1)));
-                    if (palette_index == (palette_size + ((int) (palette_size/2) + 1))) palette_index--;
-                    if (palette_index >= palette_size) palette_index -= palette_size;
-
-                    curr_tag.color = sphere.palette.colors[palette_index];
-                }
-                else {
-                    int palette_index = dist_from_center * (palette_size);
-                    if (palette_index == palette_size) palette_index--;
-                    if (palette_index >= palette_size) palette_index -= palette_size;
-
-                    curr_tag.color = sphere.palette.colors[palette_index];
-                }
+                sphere.calculate_corresponding_color(dist_from_center);
             }
             curr_tag.color = Color(255, 255, 255);
 
-            int arr_index = screen->get_index(xp, yp);
+            int arr_index = screen.get_index(xp, yp);
 
             if (ooz > ooz_data[arr_index]) { ooz_data[arr_index] = ooz; output_data[arr_index] = curr_tag; }
         }
     }
-    screen->write_to_z_buffer_and_output(ooz_data, output_data);
+    screen.write_to_z_buffer_and_output(ooz_data, output_data);
     delete [] ooz_data; delete [] output_data;
 }
 
-void draw_rect_prism (const RectPrism rect_prism, wava_screen* screen, const std::vector<double> weighting_coefficients, const float A, const float B) {
+void draw_rect_prism (RectPrism rect_prism, wava_screen &screen, const std::vector<double> weighting_coefficients, const float A, const float B) {
     float width = rect_prism.width;
     float height = rect_prism.height;
     float depth = rect_prism.depth;
 
-    float* ooz_data = new float[screen->x_dim * screen->y_dim]();
-    ColorTag* output_data = new ColorTag[screen->x_dim * screen->y_dim]();
+    float* ooz_data = new float[screen.x_dim()* screen.y_dim()]();
+    ColorTag* output_data = new ColorTag[screen.x_dim()* screen.y_dim()]();
 
     matrix3 matrix_x = matrix3('x', A), matrix_z = matrix3 ('z', B);
 
@@ -426,7 +419,7 @@ void draw_rect_prism (const RectPrism rect_prism, wava_screen* screen, const std
             for (int i = 0; i < 6; i++) {
                 vec3 transformed_pos = curr_points[i] - (vec3) {width/2, height/2, depth/2};
                 transformed_pos = transformed_pos * matrix_x * matrix_z;
-                transformed_pos = transformed_pos + (vec3) {0, 0, K2};
+                transformed_pos = transformed_pos + (vec3) {0, 0, 0.0000000001};
 
                 vec3 normal; 
                 switch (i) 
@@ -450,18 +443,15 @@ void draw_rect_prism (const RectPrism rect_prism, wava_screen* screen, const std
                     normal = {0, 1, 0};
                 break;
                 }
+
                 normal = normal * matrix_x * matrix_z;
                 normal.normalize();
 
-                float ooz = 1/transformed_pos.z;
-                int xp = (int) (screen->x_dim/2 + K1*ooz*transformed_pos.x);
-                int yp = (int) (screen->y_dim/2 - K1*ooz*transformed_pos.y);
-                if (xp >= screen->x_dim) xp = screen->x_dim - 1;
-                else if (xp < 0) xp = 0;
-                if (yp < 0) yp = 0;
-                else if  (yp >= screen->y_dim) yp = screen->y_dim - 1;
+                std::tuple<int, int, float> coord = screen.calculate_proj_coord(transformed_pos);
+                int xp = std::get<0>(coord), yp = std::get<1>(coord);
+                float ooz = std::get<2>(coord);             
 
-                float L = (normal * screen->light);
+                float L = (normal * screen.light);
 
                 L += (log(rect_prism.base_luminance + 1)*log2_inverse) - 1;
                 if (L > 1) L = 1;
@@ -473,32 +463,17 @@ void draw_rect_prism (const RectPrism rect_prism, wava_screen* screen, const std
                 }
                 else {
                     float dist_from_center = x/width;
-                    int palette_size = rect_prism.palette.colors.size();
-                    if (rect_prism.palette.symmetric) {
-                        int palette_index = dist_from_center * (palette_size + ((int) ((palette_size/2) + 1)));
-                        if (palette_index == (palette_size + ((int) (palette_size/2) + 1))) palette_index--;
-                        if (palette_index >= palette_size) palette_index -= palette_size;
-
-                        curr_tag.color = rect_prism.palette.colors[palette_index];
-                    }
-                    else {
-                        int palette_index = dist_from_center * (palette_size);
-                        if (palette_index == palette_size) palette_index--;
-                        if (palette_index >= palette_size) palette_index -= palette_size;
-
-                        curr_tag.color = rect_prism.palette.colors[palette_index];
-                    }
+                    rect_prism.calculate_corresponding_color(dist_from_center);
                 }
-                //curr_tag.color = Color(255,255,255);
 
-                int arr_index = screen->get_index(xp, yp);
+                int arr_index = screen.get_index(xp, yp);
 
                 if (ooz > ooz_data[arr_index]) { ooz_data[arr_index] = ooz; output_data[arr_index] = curr_tag; }
             }
         }
     }
   
-  screen->write_to_z_buffer_and_output(ooz_data, output_data);
+  screen.write_to_z_buffer_and_output(ooz_data, output_data);
   delete [] ooz_data; delete [] output_data;
 }
 

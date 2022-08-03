@@ -36,9 +36,8 @@ int main(int argc, char **argv)
 	while (true) {
 		printf ("wava.cpp flag 1\n");
 		// LOAD CONFIG VALUES
-		int freq_bands = 10;
-		std::vector<Shape*> shapes = generate_rand_shapes(1, 0, freq_bands);
-		wava_screen::light.normalize();
+		std::vector<Shape*> shapes = generate_rand_shapes(1, 0, wava_plan::freq_bands);
+
 		wava_screen::light_smoothness = -1;
 		// config values end
 
@@ -77,29 +76,26 @@ int main(int argc, char **argv)
 			int curr_screen_x = 50; 
 			int curr_screen_y = 50; // could be changed in next loop
 
-			struct wava_plan* plan = wava_init(freq_bands, 44100, 2, 0.77, 50, 10000);
+			struct wava_plan plan = wava_init(44100, 2, 0.77, 50, 10000);
 
-			wava_screen* screen = new wava_screen(curr_screen_x, curr_screen_y);
-			screen->bg_palette = generate_rand_palette();
+			wava_screen screen(curr_screen_x, curr_screen_y);
 
+			printf("here!!\n");
 			while (true) { // while (!resizeTerminal)
 				pthread_mutex_lock(&audio.lock);
 				std::vector<double> wava_out = wava_execute(audio.wava_in, audio.samples_counter, plan);
 				normalize_vector(wava_out);
+
+
 				if (audio.samples_counter > 0) audio.samples_counter = 0;
 				pthread_mutex_unlock(&audio.lock);
-				render_cli_frame(shapes, screen, wava_out);
+				//render_cli_frame(shapes, screen, wava_out);
 				//printf("base is: %f mid is: %f treble is: %f\n", wava_out[0] * 1.25, wava_out[1], wava_out[2]);
-				//usleep(20000); // should correspond to ~30 FPS
+				usleep(3000);
 				time+=1;        
 			}	
-
-		    wava_destroy(plan);
-			free(plan);
-
-			screen->destroy();
-			delete screen;
 		}
+
 		for (int i = 0; i < shapes.size(); i++) delete shapes[i];
 	}
 	return 0;
