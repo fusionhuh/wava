@@ -1,1 +1,5 @@
+*.obj
 *.o
+wava
+*.bin
+

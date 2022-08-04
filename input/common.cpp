@@ -15,12 +15,14 @@ int write_to_wava_input_buffers(int16_t size, int16_t* buf, void *data) {
             audio->wava_in[n] = 0;
         }
         audio->samples_counter = 0;
+        //printf("OVERFLOW!!!!\n");
     }
     for (uint16_t i = 0; i < size; i++) {
         audio->wava_in[i + audio->samples_counter] = buf[i];
     }
     audio->samples_counter += size;
     pthread_mutex_unlock(&audio->lock);
+    //printf("%d\n", audio->samples_counter);
     return 0;
 }
 

@@ -65,13 +65,28 @@ void render_cli_frame (std::vector<Shape*> shapes, wava_screen &screen, std::vec
                     if (wava_out[i + 3] > wava_out[largest]) largest = i; 
                     //color = wava_out[i + 3] * screen.bg_palette.colors[i % screen.bg_palette.colors.size()] + color;
                 }
-                color = wava_out[largest+3] * screen.bg_palette.colors[largest % screen.bg_palette.colors.size()];
+                color = wava_out[largest] * 2 * screen.bg_palette.colors[largest % screen.bg_palette.colors.size()];
                 //for (int i = 0; i < screen.bg_palette.colors.size(); i++) {
                 //    color = wava_out[i + 3] * screen.bg_palette.colors[i] + color;
                 //}
-                luminance = 1;
             }
-            printf ("\x1b[48;2;%d;%d;%dm%s", (int) (luminance * color.r), (int) (luminance * color.g), (int) (luminance * color.b), "  ");
+            
+            if (luminance > 0) 
+                printf (
+                    "\x1b[38;2;%d;%d;%dm%s", 
+                    (int) (luminance * color.r), 
+                    (int) (luminance * color.g), 
+                    (int) (luminance * color.b), 
+                    screen.get_shape_print_str()
+                );
+            else               
+                printf (
+                    "\x1b[38;2;%d;%d;%dm%s", 
+                    (int) (1 * color.r), 
+                    (int) (1 * color.g), 
+                    (int) (1 * color.b), 
+                    screen.get_background_print_str()
+                );
 
             screen.zbuffer[curr_index] = 0;   // put this in same loop to increase performance
             screen.output[curr_index].luminance = 0;

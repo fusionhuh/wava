@@ -13,9 +13,11 @@ struct wava_plan {
 	static int freq_bands;
 
 	int rate;
-	double freq_bin_size;
+	static double freq_bin_size;
 
 	double noise_reduction;
+
+	static double calibration;
 
 	fftw_plan plan_left;
 	fftw_plan plan_right;

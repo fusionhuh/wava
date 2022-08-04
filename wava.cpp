@@ -38,7 +38,7 @@ int main(int argc, char **argv)
 		// LOAD CONFIG VALUES
 		std::vector<Shape*> shapes = generate_rand_shapes(1, 0, wava_plan::freq_bands);
 
-		wava_screen::light_smoothness = -1;
+		wava_screen::light_smoothness = 8;
 		// config values end
 
 		struct audio_data audio;
@@ -66,15 +66,16 @@ int main(int argc, char **argv)
 		//if (strcmp(audio.source, "auto") == 0) {
 		get_pulse_default_sink((void*) &audio);
 		//}
-		
+		printf("here 1\n");
 		// starting pulsemusic listener
 		int thr_id = pthread_create(&p_thread, NULL, input_pulse, (void*) &audio);
+		printf("here 2\n");
 		audio.rate = 44100;
 		//break
 
 		while (true) { // while (!reloadConf) 
-			int curr_screen_x = 50; 
-			int curr_screen_y = 50; // could be changed in next loop
+			int curr_screen_x = 40; 
+			int curr_screen_y = 40; // could be changed in next loop
 
 			struct wava_plan plan = wava_init(44100, 2, 0.77, 50, 10000);
 
@@ -86,10 +87,9 @@ int main(int argc, char **argv)
 				std::vector<double> wava_out = wava_execute(audio.wava_in, audio.samples_counter, plan);
 				normalize_vector(wava_out);
 
-
 				if (audio.samples_counter > 0) audio.samples_counter = 0;
 				pthread_mutex_unlock(&audio.lock);
-				//render_cli_frame(shapes, screen, wava_out);
+				render_cli_frame(shapes, screen, wava_out);
 				//printf("base is: %f mid is: %f treble is: %f\n", wava_out[0] * 1.25, wava_out[1], wava_out[2]);
 				usleep(3000);
 				time+=1;        

@@ -8,7 +8,10 @@
 
 double wava_plan::band_lower_cutoff_freq[15] = {50, 190, 300, 430/*A*/, 456/*A#*/, 483/*B*/, 513/*C*/, 544/*C#*/, 578/*D*/, 612/*D#*/, 649/*E*/, 688/*F*/, 729/*F#*/, 773 /*G*/, 821/*G#*/};
 double wava_plan::band_upper_cutoff_freq[15] = {60, 200, 310,450,      476,       503,      533,      564,       598,      632,       669,      708,      749,       793,       841};
-double wava_plan::band_octaves_count[15] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+double wava_plan::band_octaves_count[15] = { 0, 0, 0, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3 };
+
+double wava_plan::freq_bin_size = 0;
+double wava_plan::calibration = 0;
 
 int wava_plan::freq_bands = 15;
 
@@ -42,7 +45,10 @@ struct wava_plan wava_init(unsigned int rate, int channels, double noise_reducti
 	// error checks placed here
 
 	plan.rate = rate;
-	plan.freq_bin_size = (plan.rate/2)/(8192/2);
+	//plan.freq_bin_size = (plan.rate/2)/(8192/2);
+	wava_plan::freq_bin_size = (plan.rate/2)/(8192/2);
+
+	wava_plan::calibration = 1.0775;
 
 	plan.audio_channels = channels;
 	plan.rate = rate;
@@ -76,6 +82,45 @@ struct wava_plan wava_init(unsigned int rate, int channels, double noise_reducti
 	// then some band processing stuff?
 
 	return plan;
+}
+
+double calculate_band_value(int freq_band, fftw_complex* output_data) {
+	double inverse = 1.0l/8192.0l;
+	double inverse_calibration = 1/wava_plan::calibration;
+
+	int octaves = wava_plan::band_octaves_count[freq_band];
+
+	double band_lower_cutoff = wava_plan::band_lower_cutoff_freq[freq_band] * 0.5 * inverse_calibration;
+	double band_upper_cutoff = wava_plan::band_upper_cutoff_freq[freq_band] * 0.5 * inverse_calibration;
+	double center_frequency = (band_lower_cutoff + band_upper_cutoff)/2;
+
+	int start_index = (band_lower_cutoff / wava_plan::freq_bin_size);
+	int end_index = (band_upper_cutoff / wava_plan::freq_bin_size);
+
+	double curr_band_sum = 0;
+
+	for (int a = 0; a < octaves + 1; a++) {
+		for (int b = start_index; b <= end_index; b++) {
+			double magnitude = hypot(output_data[b][0], output_data[b][1])*inverse; // normalize by sample count
+
+			if (a >= 3) {
+				double domain_span = band_upper_cutoff - band_lower_cutoff;
+				double curr_frequency = (wava_plan::freq_bin_size * b) - band_lower_cutoff;
+
+				double normalized_x = (curr_frequency / domain_span) - 0.5;
+
+				magnitude *= (1 - (abs(normalized_x * 1.8)) * (abs(normalized_x * 1.8))); // (1 - (abs(x))^2)
+			}
+			curr_band_sum += (magnitude > 50) ? (magnitude - 50) * 1.5 : 0; 
+
+			//curr_band_sum_l += magnitude;
+			//if (magnitude > 200) printf("curr_magnitude is: %f\n", magnitude);
+		}
+		center_frequency *= 2;
+		band_lower_cutoff = center_frequency * 2 - 5;
+		band_upper_cutoff = center_frequency * 2 + 5;
+	}
+	return curr_band_sum/(band_upper_cutoff - band_lower_cutoff);
 }
 
 std::vector<double> wava_execute(double* wava_in, int new_samples, struct wava_plan &plan) {
@@ -131,44 +176,17 @@ std::vector<double> wava_execute(double* wava_in, int new_samples, struct wava_p
 	std::vector<double> wava_out = std::vector<double>(plan.freq_bands);
 
 	double inverse = 1.0l/8192.0l;
+	double inverse_calibration = 1.0l/1.0775;
 
 	for (int a = 0; a < plan.freq_bands; a++) {
-		double band_lower_cutoff = plan.band_lower_cutoff_freq[a];
-		double band_upper_cutoff = plan.band_upper_cutoff_freq[a];
-		double center_frequency = (band_lower_cutoff + band_upper_cutoff)/2;
-
-		// just going to handle left ("main") channel for now
-		int start_index = band_lower_cutoff / plan.freq_bin_size;
-		int end_index = band_upper_cutoff / plan.freq_bin_size;
-
-		double curr_band_sum_l = 0;
-
-		for (int b = start_index; b <= end_index; b++) {
-			double magnitude = hypot(plan.l_output_data[b][0], plan.l_output_data[b][1])*inverse; // normalize by sample count
-
-			curr_band_sum_l += (magnitude > 100) ? (magnitude - 100) * 1.5 : 0; 
-			//curr_band_sum_l += magnitude;
-			//if (magnitude > 200) printf("curr_magnitude is: %f\n", magnitude);
+		if (plan.audio_channels == 1) {
+			wava_out[a] = calculate_band_value(a, plan.l_output_data);
+		} 
+		else {
+			wava_out[a] = (calculate_band_value(a, plan.l_output_data) + calculate_band_value(a, plan.r_output_data))/2;
 		}
-		for (int octave = 0; octave < plan.band_octaves_count[a]; octave++) {
-			center_frequency*=2; // bitshifting left to multiply by pow(2, octave);
-			band_lower_cutoff+=5;
-			band_upper_cutoff+=5;
 
-			start_index = band_lower_cutoff / plan.freq_bin_size;
-			end_index = band_upper_cutoff / plan.freq_bin_size;
-
-			for (int b = start_index; b <= end_index; b++) {
-				double magnitude = hypot(plan.l_output_data[b][0], plan.l_output_data[b][1])*inverse; // normalize by sample count
-
-				curr_band_sum_l += (magnitude > 150) ? (magnitude - 150) * 1.5 : 0; 
-			}
-		}
-		wava_out[a] = (curr_band_sum_l/((band_upper_cutoff - band_lower_cutoff)));
-		if (wava_out[a] < plan.prev_wava_out[a]) {
-			if (wava_out[a] < plan.prev_wava_out[a] * 0.95) {
-				wava_out[a] = plan.prev_wava_out[a] * 0.95;
-			}
+		if (wava_out[a] < wava_out[a]) {
 		}
 
 		plan.prev_wava_out[a] = wava_out[a];
@@ -181,20 +199,11 @@ std::vector<double> wava_execute(double* wava_in, int new_samples, struct wava_p
 		}
 	}
 
-	printf("largest frequency component: %f\n", greatest_freq * plan.freq_bin_size);
+	printf("largest frequency component: %f  amplitude is: %f\n", greatest_freq * plan.freq_bin_size * 1.0775, hypot(plan.l_output_data[greatest_freq][0], plan.l_output_data[greatest_freq][1])/44100); // 1.0775 is a calibration constant
 
-	/*int zero_count = 0;
-	for (int i = 0; i < 8192; i++) {
-		if (plan.l_output_data[i][0] == 0) zero_count++;
-	}
-	printf("zero count is: %d", zero_count);*/
+	printf("magnitude of C band: %f\n", wava_out[6]);
 
 	printf("\x1b[H");
-	/*for (int i = 0; i < 12; i++) {
-		printf("band left: %f, band right: %f\n", plan.band_lower_cutoff_freq[i], plan.band_upper_cutoff_freq[i]);
-		printf("start index: %f, end index: %f\n", plan.band_lower_cutoff_freq[i]/plan.freq_bin_size, plan.band_upper_cutoff_freq[i]/plan.freq_bin_size);
-		printf("band %d: %f\n", i, wava_out[i]);
-	}*/
 
 
 	return wava_out;

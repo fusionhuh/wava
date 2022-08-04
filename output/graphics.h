@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <mutex>
+#include <string>
 
 // color/shapes portion
 #define RECT_PRISM_SHAPE 0
@@ -27,8 +28,8 @@
 #ifndef PI
 #define PI 3.14159265359
 #endif
-#define THETA_SPACING 0.04
-#define PHI_SPACING 0.04
+#define THETA_SPACING 1
+#define PHI_SPACING 0.1
 #define PRISM_SPACING 0.041
 
 struct vec3
@@ -171,6 +172,9 @@ struct wava_screen {
 
 		float K1, K2, R1, R2;
 
+		std::string background_print_str;
+		std::string shape_print_str;
+
 	public:
 		static vec3 light;
 		static float light_smoothness;
@@ -186,6 +190,9 @@ struct wava_screen {
 		std::vector<ColorTag> output;
 
 		int get_index(int x_coord, int y_coord);
+
+		const char* get_shape_print_str();
+		const char* get_background_print_str();
 
 		std::tuple<int, int, float> calculate_proj_coord(vec3 pos);
 

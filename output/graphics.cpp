@@ -143,7 +143,7 @@ std::vector<Shape*> generate_rand_shapes(const int count, const float variance, 
             case DONUT_SHAPE:
             {
                 Donut* donut = new Donut();
-                donut->radius = 1;
+                donut->radius = 0.5;
                 donut->thickness = 0.25;
 
                 donut->base_luminance = 2;
@@ -228,6 +228,9 @@ wava_screen::wava_screen(int x, int y) {
 
     light.normalize();
 
+    background_print_str = std::string("@@");
+    shape_print_str = std::string("XX");
+
     this->x = x;
     this->y = y;
 
@@ -251,6 +254,14 @@ int wava_screen::y_dim() { return y; }
 
 int wava_screen::get_index(int curr_x, int curr_y) {
   return (curr_x * y + curr_y);
+}
+
+const char* wava_screen::get_shape_print_str() {
+    return shape_print_str.c_str();
+}
+
+const char* wava_screen::get_background_print_str() {
+    return background_print_str.c_str();
 }
 
 std::tuple<int, int, float> wava_screen::calculate_proj_coord(vec3 pos) {
