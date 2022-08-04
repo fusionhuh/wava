@@ -15,13 +15,13 @@
 
 #include <fftw3.h>
 
-#include "input/common.h"
-#include "input/pulse.h"
+#include <common.h>
+#include <pulse.h>
 
-#include "transform/wavatransform.h"
+#include <wavatransform.h>
 
-#include "output/graphics.h"
-#include "output/cli.h"
+#include <graphics.h>
+#include <cli.h>
 
 // PRIORITIES AND NOTES AT THE MOMENT:
 
@@ -34,7 +34,6 @@ int main(int argc, char **argv)
 
 	// main loop	
 	while (true) {
-		printf ("wava.cpp flag 1\n");
 		// LOAD CONFIG VALUES
 		std::vector<Shape*> shapes = generate_rand_shapes(1, 0, wava_plan::freq_bands);
 
@@ -66,10 +65,8 @@ int main(int argc, char **argv)
 		//if (strcmp(audio.source, "auto") == 0) {
 		get_pulse_default_sink((void*) &audio);
 		//}
-		printf("here 1\n");
 		// starting pulsemusic listener
 		int thr_id = pthread_create(&p_thread, NULL, input_pulse, (void*) &audio);
-		printf("here 2\n");
 		audio.rate = 44100;
 		//break
 
@@ -81,7 +78,6 @@ int main(int argc, char **argv)
 
 			wava_screen screen(curr_screen_x, curr_screen_y);
 
-			printf("here!!\n");
 			while (true) { // while (!resizeTerminal)
 				pthread_mutex_lock(&audio.lock);
 				std::vector<double> wava_out = wava_execute(audio.wava_in, audio.samples_counter, plan);

@@ -1,5 +1,5 @@
 #include <thread>
-#include "cli.h"
+#include <cli.h>
 
 void render_cli_frame (std::vector<Shape*> shapes, wava_screen &screen, std::vector<double> wava_out) {
     static int time = 0;

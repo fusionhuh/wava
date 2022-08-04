@@ -1,10 +1,10 @@
-#include "wavatransform.h"
-
-//#include <fftw3.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+#include <wavatransform.h>
+
 
 double wava_plan::band_lower_cutoff_freq[15] = {50, 190, 300, 430/*A*/, 456/*A#*/, 483/*B*/, 513/*C*/, 544/*C#*/, 578/*D*/, 612/*D#*/, 649/*E*/, 688/*F*/, 729/*F#*/, 773 /*G*/, 821/*G#*/};
 double wava_plan::band_upper_cutoff_freq[15] = {60, 200, 310,450,      476,       503,      533,      564,       598,      632,       669,      708,      749,       793,       841};

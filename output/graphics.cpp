@@ -4,11 +4,9 @@
 #include <string>
 #include <mutex>
 #include <thread>
-#include "graphics.h"
+#include <graphics.h>
 
 // Based HEAVILY on: https://www.a1k0n.net/2011/07/20/donut-math.html
-
-
 
 Color::Color() {}
 Color::Color(uint8_t r, uint8_t g, uint8_t b) {
