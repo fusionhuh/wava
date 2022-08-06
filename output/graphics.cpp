@@ -227,7 +227,7 @@ wava_screen::wava_screen(int x, int y) {
     light.normalize();
 
     background_print_str = std::string("@@");
-    shape_print_str = std::string("XX");
+    shape_print_str = std::string("◆◆");
 
     this->x = x;
     this->y = y;

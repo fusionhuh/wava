@@ -65,7 +65,7 @@ void render_cli_frame (std::vector<Shape*> shapes, wava_screen &screen, std::vec
                     if (wava_out[i + 3] > wava_out[largest]) largest = i; 
                     //color = wava_out[i + 3] * screen.bg_palette.colors[i % screen.bg_palette.colors.size()] + color;
                 }
-                color = wava_out[largest] * 2 * screen.bg_palette.colors[largest % screen.bg_palette.colors.size()];
+                color = wava_out[largest + 3] * 2 * screen.bg_palette.colors[largest % screen.bg_palette.colors.size()];
                 //for (int i = 0; i < screen.bg_palette.colors.size(); i++) {
                 //    color = wava_out[i + 3] * screen.bg_palette.colors[i] + color;
                 //}

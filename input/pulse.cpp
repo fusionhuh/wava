@@ -4,6 +4,7 @@
 #include <pulse/error.h>
 #include <pulse/pulseaudio.h>
 #include <pulse/simple.h>
+#include <wavatransform.h>
 
 pa_mainloop *m_pulseaudio_mainloop;
 
@@ -103,7 +104,7 @@ void *input_pulse(void *data) {
     struct audio_data *audio = (struct audio_data *)data;
     uint16_t frames = audio->input_buffer_size/2;
     int channels = 2;
-    int16_t* buf = new int16_t[4096];
+    int16_t* buf = new int16_t[8192];
 
     /* The sample type to use */
     static const pa_sample_spec ss = {.format = PA_SAMPLE_S16LE, .rate = 44100, .channels = 2};
@@ -114,12 +115,12 @@ void *input_pulse(void *data) {
                           2; // we double this because of cpu performance issues with pulseaudio
 
     pa_buffer_attr pb = {.maxlength = (uint32_t)-1, // BUFSIZE * 2,
-                         .fragsize = frag_size};
+                         .fragsize = 16384};
 
     pa_simple *s = NULL;
     int error;
 
-    if (!(s = pa_simple_new(NULL, "cava", PA_STREAM_RECORD, audio->source, "audio for wava", &ss,
+    if (!(s = pa_simple_new(NULL, "wava", PA_STREAM_RECORD, audio->source, "audio for wava", &ss,
                             NULL, &pb, &error))) {
         sprintf(audio->error_message, __FILE__ ": Could not open pulseaudio source: %s, %s. \
 		To find a list of your pulseaudio sources run 'pacmd list-sources'\n",
@@ -131,12 +132,13 @@ void *input_pulse(void *data) {
     }
 
     while (!audio->terminate) {
-        if (pa_simple_read(s, buf, 4096, &error) < 0) {
+        if (pa_simple_read(s, buf, 8192, &error) < 0) {
             sprintf(audio->error_message, __FILE__ ": pa_simple_read() failed: %s\n",
                     pa_strerror(error));
             audio->terminate = 1;
         }
-        write_to_wava_input_buffers(4096, buf, data);
+        
+        write_to_wava_input_buffers(8192, buf, data);
     }
 
     delete [] buf;

@@ -37,12 +37,15 @@ struct wava_plan {
 	fftw_complex* l_output_data;
 	fftw_complex* r_output_data;
 
+	std::vector<double> l_output_data_magnitude;
+	std::vector<double> r_output_data_magnitude;
+
 	int lower_cut_off; // ?
 	int upper_cut_off; // ?
 
 	static double band_lower_cutoff_freq[15];
 	static double band_upper_cutoff_freq[15];
-	static double band_octaves_count[15];
+	static double band_harmonics_count[15];
 
 	double prev_wava_out[15];
 

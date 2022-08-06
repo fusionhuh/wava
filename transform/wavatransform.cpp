@@ -6,9 +6,9 @@
 #include <wavatransform.h>
 
 
-double wava_plan::band_lower_cutoff_freq[15] = {50, 190, 300, 430/*A*/, 456/*A#*/, 483/*B*/, 513/*C*/, 544/*C#*/, 578/*D*/, 612/*D#*/, 649/*E*/, 688/*F*/, 729/*F#*/, 773 /*G*/, 821/*G#*/};
-double wava_plan::band_upper_cutoff_freq[15] = {60, 200, 310,450,      476,       503,      533,      564,       598,      632,       669,      708,      749,       793,       841};
-double wava_plan::band_octaves_count[15] = { 0, 0, 0, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3 };
+double wava_plan::band_lower_cutoff_freq[15] = {0, 190, 300, 430/*A*/, 456/*A#*/, 483/*B*/, 513/*C*/, 544/*C#*/, 578/*D*/, 612/*D#*/, 649/*E*/, 688/*F*/, 729/*F#*/, 773 /*G*/, 821/*G#*/};
+double wava_plan::band_upper_cutoff_freq[15] = {150, 200, 310,450,      476,       503,      533,      564,       598,      632,       669,      708,      749,       793,       841};
+double wava_plan::band_harmonics_count[15] = { 0, 0, 0, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3 };
 
 double wava_plan::freq_bin_size = 0;
 double wava_plan::calibration = 0;
@@ -46,7 +46,7 @@ struct wava_plan wava_init(unsigned int rate, int channels, double noise_reducti
 
 	plan.rate = rate;
 	//plan.freq_bin_size = (plan.rate/2)/(8192/2);
-	wava_plan::freq_bin_size = (plan.rate/2)/(8192/2);
+	wava_plan::freq_bin_size = (plan.rate/2)/(8192 + 1);
 
 	wava_plan::calibration = 1.0775;
 
@@ -59,24 +59,26 @@ struct wava_plan wava_init(unsigned int rate, int channels, double noise_reducti
 
 	// Hann Window multipliers
 	for (int i = 0; i < 8192; i++) {
-		plan.hann_multiplier[i] = 0.5 * (1 - cos(2*PI * i / (plan.input_buffer_size-1)));	
+		plan.hann_multiplier[i] = 0.5 * (1 - cos(2*PI * i / (8192-1)));	
 	}
 
 	// Allocate + initialize buffers
 	plan.input_buffer = new double[plan.input_buffer_size]();
 
-	plan.l_sample_data_raw = allocate_initialized_fftw_real(8192);
-    	plan.l_sample_data = allocate_initialized_fftw_real(8192);
-    	plan.l_output_data = allocate_initialized_fftw_complex(8192/2 + 1);	
+	plan.l_sample_data_raw = allocate_initialized_fftw_real(16384);
+	plan.l_sample_data = allocate_initialized_fftw_real(16384);
+	plan.l_output_data = allocate_initialized_fftw_complex(8192 + 1);
+	plan.l_output_data_magnitude = std::vector<double>(8192 + 1);	
 
-    plan.plan_left = fftw_plan_dft_r2c_1d(8192, plan.l_sample_data, plan.l_output_data, FFTW_MEASURE);
+    plan.plan_left = fftw_plan_dft_r2c_1d(16384, plan.l_sample_data, plan.l_output_data, FFTW_MEASURE);
 
 	if (plan.audio_channels == 2) { // two channels
-		plan.r_sample_data_raw = allocate_initialized_fftw_real(8192);
-		plan.r_sample_data = allocate_initialized_fftw_real(8192);
-		plan.r_output_data = allocate_initialized_fftw_complex(8192/2 + 1);
-		
-		plan.plan_right = fftw_plan_dft_r2c_1d(8192, plan.r_sample_data, plan.r_output_data, FFTW_MEASURE);
+		plan.r_sample_data_raw = allocate_initialized_fftw_real(16384);
+		plan.r_sample_data = allocate_initialized_fftw_real(16384);
+		plan.r_output_data = allocate_initialized_fftw_complex(8192 + 1);
+		plan.r_output_data_magnitude = std::vector<double>(8192 + 1);
+
+		plan.plan_right = fftw_plan_dft_r2c_1d(16384, plan.r_sample_data, plan.r_output_data, FFTW_MEASURE);
 	}
 
 	// then some band processing stuff?
@@ -85,42 +87,68 @@ struct wava_plan wava_init(unsigned int rate, int channels, double noise_reducti
 }
 
 double calculate_band_value(int freq_band, fftw_complex* output_data) {
-	double inverse = 1.0l/8192.0l;
+	double inverse = 1.0l/16384.0l;
 	double inverse_calibration = 1/wava_plan::calibration;
 
-	int octaves = wava_plan::band_octaves_count[freq_band];
+	int harmonics = wava_plan::band_harmonics_count[freq_band];
 
-	double band_lower_cutoff = wava_plan::band_lower_cutoff_freq[freq_band] * 0.5 * inverse_calibration;
-	double band_upper_cutoff = wava_plan::band_upper_cutoff_freq[freq_band] * 0.5 * inverse_calibration;
-	double center_frequency = (band_lower_cutoff + band_upper_cutoff)/2;
+	double band_lower_cutoff = wava_plan::band_lower_cutoff_freq[freq_band] * 1.0 * inverse_calibration;
+	double band_upper_cutoff = wava_plan::band_upper_cutoff_freq[freq_band] * 1.0 * inverse_calibration;
+	double center_freq = (band_lower_cutoff + band_upper_cutoff)/2;
 
 	int start_index = (band_lower_cutoff / wava_plan::freq_bin_size);
 	int end_index = (band_upper_cutoff / wava_plan::freq_bin_size);
 
 	double curr_band_sum = 0;
 
-	for (int a = 0; a < octaves + 1; a++) {
+	for (int a = 0; a < harmonics + 1; a++) {
 		for (int b = start_index; b <= end_index; b++) {
 			double magnitude = hypot(output_data[b][0], output_data[b][1])*inverse; // normalize by sample count
 
 			if (a >= 3) {
 				double domain_span = band_upper_cutoff - band_lower_cutoff;
-				double curr_frequency = (wava_plan::freq_bin_size * b) - band_lower_cutoff;
+				double curr_freq = (wava_plan::freq_bin_size * b) - band_lower_cutoff;
 
-				double normalized_x = (curr_frequency / domain_span) - 0.5;
+				double normalized_x = (curr_freq / domain_span) - 0.5;
 
 				magnitude *= (1 - (abs(normalized_x * 1.8)) * (abs(normalized_x * 1.8))); // (1 - (abs(x))^2)
 			}
-			curr_band_sum += (magnitude > 50) ? (magnitude - 50) * 1.5 : 0; 
+			if (a == 0) curr_band_sum = magnitude;
+			else curr_band_sum *= magnitude > 0 ? (magnitude - 0) * 1.5 : 0; 
 
 			//curr_band_sum_l += magnitude;
 			//if (magnitude > 200) printf("curr_magnitude is: %f\n", magnitude);
 		}
-		center_frequency *= 2;
-		band_lower_cutoff = center_frequency * 2 - 5;
-		band_upper_cutoff = center_frequency * 2 + 5;
+		center_freq += center_freq/(a + 1);
+		band_lower_cutoff = center_freq * 2 - 10;
+		band_upper_cutoff = center_freq * 2 + 10;
 	}
-	return curr_band_sum/(band_upper_cutoff - band_lower_cutoff);
+	return curr_band_sum/((band_upper_cutoff - band_lower_cutoff) * 5);
+}
+
+std::vector<double> downsample(std::vector<double> magnitudes, int harmonic) {
+	std::vector<double> downsampled_magnitudes(magnitudes.size()/harmonic);
+
+	for (int i = 0; i < downsampled_magnitudes.size(); i++) {
+		downsampled_magnitudes[i] = magnitudes[i * harmonic];
+	}
+
+	return downsampled_magnitudes;
+}
+
+std::vector<double> calculate_hps(std::vector<double> magnitudes, int harmonics) {
+	int hps_output_size = (magnitudes.size()/2); // 3 is  the temp number of harmonics for now
+	std::vector<double> hps_output(hps_output_size);
+
+	std::vector<double> hps2 = downsample(magnitudes, 2);
+	std::vector<double> hps3 = downsample(magnitudes, 3);
+	std::vector<double> hps4 = downsample(magnitudes, 4);
+
+	for (int i = 0; i < hps_output_size; i++) {
+		hps_output[i] = magnitudes[i] * hps2[i];
+	}
+
+	return hps_output;
 }
 
 std::vector<double> wava_execute(double* wava_in, int new_samples, struct wava_plan &plan) {
@@ -151,8 +179,12 @@ std::vector<double> wava_execute(double* wava_in, int new_samples, struct wava_p
 	else {
 		// frame skip or smth? might be relevant later
 	}
+	/*for (int i = 0; i < 16384; i++) {
+		plan.input_buffer[i] = wava_in[i];
+	}*/
 
-	// fill the input buffers
+	// Fill the input buffers
+    // only fill up half of sample arrays because the other half is padded
 	for (uint16_t n = 0; n < 8192; n++) {
 		if (plan.audio_channels == 2) {
 			plan.l_sample_data_raw[n] = plan.input_buffer[n*2];
@@ -164,44 +196,63 @@ std::vector<double> wava_execute(double* wava_in, int new_samples, struct wava_p
 	}
 
 	// Actually applying Hann Window
+	// again, only apply window to half of sample data because of padding
 	for (int i = 0; i < 8192; i++) {
 		plan.l_sample_data[i] = plan.hann_multiplier[i] * plan.l_sample_data_raw[i]; 
 		if (plan.audio_channels == 2) plan.r_sample_data[i] = plan.hann_multiplier[i] * plan.r_sample_data_raw[i];
+	}
+
+	for (int i = 0; i < 8192; i++) {
+		plan.l_sample_data[i + 8192] = plan.l_sample_data[i];
 	}
 
 	// Execute FFT
 	fftw_execute(plan.plan_left);
 	if (plan.audio_channels == 2) fftw_execute(plan.plan_right);
 
-	std::vector<double> wava_out = std::vector<double>(plan.freq_bands);
+	std::vector<double> wava_out(plan.freq_bands);
 
-	double inverse = 1.0l/8192.0l;
-	double inverse_calibration = 1.0l/1.0775;
-
-	for (int a = 0; a < plan.freq_bands; a++) {
-		if (plan.audio_channels == 1) {
-			wava_out[a] = calculate_band_value(a, plan.l_output_data);
-		} 
-		else {
-			wava_out[a] = (calculate_band_value(a, plan.l_output_data) + calculate_band_value(a, plan.r_output_data))/2;
-		}
-
-		if (wava_out[a] < wava_out[a]) {
-		}
-
-		plan.prev_wava_out[a] = wava_out[a];
+	for (int i = 0; i < (8192 + 1); i++) {
+		plan.l_output_data_magnitude[i] = hypot(plan.l_output_data[i][0], plan.l_output_data[i][1]);
+		if (plan.audio_channels == 2) plan.r_output_data_magnitude[i] = hypot(plan.r_output_data[i][0], plan.r_output_data[i][1]);
 	}
-	int greatest_freq = 0;
 
-	for (int i = 0; i < 8192/2 + 1; i++) {
-		if (hypot(plan.l_output_data[i][0], plan.l_output_data[i][1]) > hypot(plan.l_output_data[greatest_freq][0], plan.l_output_data[greatest_freq][0])) {
-			greatest_freq = i;
+	std::vector<double> hps_output = calculate_hps(plan.l_output_data_magnitude, 3);
+
+	int max_freq_index = -1;
+	double max_magnitude = -1;
+	for (int i = 0; i < hps_output.size(); i++) {
+		if (hps_output[i] > max_magnitude) {
+			max_freq_index = i;
+			max_magnitude = hps_output[i];
 		}
 	}
 
-	printf("largest frequency component: %f  amplitude is: %f\n", greatest_freq * plan.freq_bin_size * 1.0775, hypot(plan.l_output_data[greatest_freq][0], plan.l_output_data[greatest_freq][1])/44100); // 1.0775 is a calibration constant
+	double max_freq = ((float) (44100/2)/(hps_output.size())) * max_freq_index;	
 
-	printf("magnitude of C band: %f\n", wava_out[6]);
+	printf("max freq is: %d\n", max_freq);
+	int note = -1;
+	if (max_freq > 0) {
+		while (max_freq > 841) max_freq *= 0.5; // bring within note band ranges
+		printf("max freq is: %d\n", max_freq);
+		while (max_freq < 43) max_freq *= 2;
+		printf("max freq is: %d\n", max_freq);
+	}
+
+	for (int i = 3; i < 15; i++) {
+		if (max_freq < wava_plan::band_upper_cutoff_freq[i] && max_freq > wava_plan::band_lower_cutoff_freq[i]) {
+			note = i;
+			wava_out[i] = max_magnitude;
+			break;
+		}
+	}
+
+	wava_out[0] = calculate_band_value(0, plan.l_output_data);
+
+	printf("largest frequency component computed with hps: %f\n", max_freq); // 1.0775 is a calibration constant
+
+	printf("estimated note: %d000000000\n", note);
+	//printf("magnitude of C band: %f\n", wava_out[6]);
 
 	printf("\x1b[H");
 
