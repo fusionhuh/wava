@@ -22,7 +22,7 @@ in your terminal on Ubuntu/Debian systems.
 after dependencies are installed, run
 ```
 make
-make install
+sudo make install
 ```
 in the cloned repo to install wava.
 
