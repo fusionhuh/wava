@@ -17,7 +17,8 @@
 
 #define PRIDE_FLAG_PALETTE 0
 #define TRANS_FLAG_PALETTE 1
-#define WAVA_PALETTE_COUNT 2
+#define EERIE_PALETTE 2
+#define WAVA_PALETTE_COUNT 3
 
 #define BASS_WEIGHT_FUNCTION 0
 #define MID_WEIGHT_FUNCTION 1
@@ -76,13 +77,15 @@ struct Color {
 
 	Color();
 	Color(uint8_t r, uint8_t g, uint8_t b);
+
+	Color operator+(const Color& color2);
 };
 
-Color operator+(const Color color1, const Color color2);
 
-Color operator*(const double scalar, const Color color);
 
-bool operator==(const Color color1, const Color color2);
+Color operator*(double scalar, const Color& color);
+
+bool operator==(const Color& color1, const Color& color2);
 
 struct ColorTag {
     Color color;

@@ -77,7 +77,6 @@ int main(int argc, char **argv)
 			struct wava_plan plan = wava_init(44100, 2, 0.77, 50, 10000);
 
 			wava_screen screen(curr_screen_x, curr_screen_y);
-
 			while (true) { // while (!resizeTerminal)
 				pthread_mutex_lock(&audio.lock);
 				std::vector<double> wava_out = wava_execute(audio.wava_in, audio.samples_counter, plan);
@@ -85,11 +84,17 @@ int main(int argc, char **argv)
 
 				if (audio.samples_counter > 0) audio.samples_counter = 0;
 				pthread_mutex_unlock(&audio.lock);
+
+				/*for (int i = 0; i < 15; i++) {
+					printf("freq band %d: %f\n", i, wava_out[i]);
+				}
+				printf("\x1b[H");*/
 				render_cli_frame(shapes, screen, wava_out);
 				//printf("base is: %f mid is: %f treble is: %f\n", wava_out[0] * 1.25, wava_out[1], wava_out[2]);
-				usleep(3000);
-				time+=1;        
+				usleep(1000); // NEED this or some kind of delay to get results that make sense apparently
+				time++;        
 			}	
+			exit(-1);
 		}
 
 		for (int i = 0; i < shapes.size(); i++) delete shapes[i];

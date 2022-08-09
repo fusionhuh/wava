@@ -15,15 +15,19 @@ Color::Color(uint8_t r, uint8_t g, uint8_t b) {
 	Color::b = b;
 }
 
-Color operator+(const Color color1, const Color color2) {
-    return Color(color1.r + color2.r, color1.g + color2.g, color1.b + color2.b);
+Color Color::operator+(const Color& color2) {
+    return Color(
+        (this->r + color2.r <= 255) ? this->r + color2.r : 255,
+        (this->g + color2.g <= 255) ? this->g + color2.g : 255,
+        (this->b + color2.b <= 255) ? this->b + color2.b : 255
+    );
 }
 
-Color operator*(const double scalar, const Color color) {
+Color operator*(double scalar, const Color& color) {
     return Color(color.r * scalar, color.g * scalar, color.b * scalar);
 }
 
-bool operator==(const Color color1, const Color color2) {
+bool operator==(const Color& color1, const Color& color2) {
     if (color1.r == color2.r && color1.g == color2.g && color1.b == color2.b) return true;
     else return false;
 }
@@ -82,6 +86,15 @@ ColorPalette generate_rand_palette() {
             palette.colors.push_back(Color(0x00, 0x79, 0x40) /*green*/);
             palette.colors.push_back(Color(0x24, 0x40, 0x8E)); // blue
             palette.colors.push_back(Color(0x73, 0x29, 0x82) /*violet*/);
+        break;
+        case EERIE_PALETTE:
+            palette.name = std::string("eerie");
+            palette.symmetric = false;
+            palette.colors.push_back(Color(0x1A, 0x18, 0x1B));
+            palette.colors.push_back(Color(0x56, 0x4D, 0x65));
+            palette.colors.push_back(Color(0x3E, 0x89, 0x89));
+            palette.colors.push_back(Color(0x2C, 0xDA, 0x9D));
+            palette.colors.push_back(Color(0x05, 0xF1, 0x40));
         break;
         default:
             fputs("Invalid palette type generated.", stderr);
@@ -226,8 +239,8 @@ wava_screen::wava_screen(int x, int y) {
 
     light.normalize();
 
-    background_print_str = std::string("@@");
-    shape_print_str = std::string("◆◆");
+    background_print_str = std::string("██");
+    shape_print_str = std::string("██");
 
     this->x = x;
     this->y = y;
@@ -292,7 +305,7 @@ void wava_screen::write_to_z_buffer_and_output(const float* zbuffer, const Color
 
 vec3 operator*(vec3 vec, matrix3 mat) { return { vec * mat.col_one, vec * mat.col_two, vec * mat.col_three }; }
 
-void draw_donut (Donut donut, wava_screen &screen, const std::vector<double> wava_out, const float A, const float B) {
+void draw_donut (Donut donut, wava_screen &screen, std::vector<double> wava_out, float A, float B) {
     float radius = donut.radius, thickness = donut.thickness, luminance = donut.base_luminance;
     double radius_increase = donut.radius_weighting_function * wava_out * 0.5;
     double thickness_increase = donut.thickness_weighting_function * wava_out;
@@ -349,7 +362,7 @@ void draw_donut (Donut donut, wava_screen &screen, const std::vector<double> wav
     delete [] ooz_data; delete [] output_data;
 }
 
-void draw_sphere (Sphere sphere, wava_screen &screen, const std::vector<double> weighting_coefficients, const float A, const float B) {
+void draw_sphere (Sphere sphere, wava_screen &screen, std::vector<double> weighting_coefficients, float A, float B) {
     float radius = sphere.radius;
 
     float* ooz_data = new float[screen.x_dim()* screen.y_dim()]();
@@ -400,7 +413,7 @@ void draw_sphere (Sphere sphere, wava_screen &screen, const std::vector<double> 
     delete [] ooz_data; delete [] output_data;
 }
 
-void draw_rect_prism (RectPrism rect_prism, wava_screen &screen, const std::vector<double> weighting_coefficients, const float A, const float B) {
+void draw_rect_prism (RectPrism rect_prism, wava_screen& screen, std::vector<double> weighting_coefficients, float A, float B) {
     float width = rect_prism.width;
     float height = rect_prism.height;
     float depth = rect_prism.depth;
