@@ -1,6 +1,8 @@
 # w.a.v.a.
 **w**eird **a**udio **v**isualizer for **A**LSA
 
+![new_video](https://user-images.githubusercontent.com/59339739/183812501-d06a0f05-e7dc-4e2a-9187-b9006cd23b6e.gif)
+
 # about
 
 wava is a commandline audio visualizer for ALSA and Pulseaudio that is heavily inspired by [cava](https://github.com/karlstav/cava). however, instead of visualizing
@@ -25,4 +27,16 @@ make
 sudo make install
 ```
 in the cloned repo to install wava.
+
+to uninstall, run
+```
+make uninstall
+```
+in the cloned repo. 
+
+# usage
+
+with no options, wava will simply render a colored background that responds to audio. if you want to render shapes, you must specify which shapes and how many using the options below:
+
+
 
