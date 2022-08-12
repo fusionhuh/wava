@@ -1,5 +1,5 @@
 #include <thread>
-#include <cli.h>
+#include <cli.hpp>
 
 void render_cli_frame (std::vector<Shape*> shapes, wava_screen &screen, std::vector<double> wava_out) {
     static int time = 0;
@@ -18,7 +18,7 @@ void render_cli_frame (std::vector<Shape*> shapes, wava_screen &screen, std::vec
             case RECT_PRISM_SHAPE:
                 {
                 RectPrism* rect_prism = (RectPrism*) shapes[i];
-                std::thread rect_prism_thread(draw_rect_prism, *rect_prism, std::ref(screen), weighting, 0 + time * 0.01, 5 + time * 0.01);
+                std::thread rect_prism_thread(draw_rect_prism, *rect_prism, std::ref(screen), wava_out, 0 + time * 0.01, 5 + time * 0.01);
                 threads.push_back(std::move(rect_prism_thread));
                 }
             break;  
@@ -26,7 +26,7 @@ void render_cli_frame (std::vector<Shape*> shapes, wava_screen &screen, std::vec
                 {
                 Sphere* sphere = (Sphere*) shapes[i];
                 //draw_sphere(*sphere, screen, weighting, 0 + time * 0.01, 5 + time * 0.01);
-                std::thread sphere_thread(draw_sphere, *sphere, std::ref(screen), weighting, 0 + time * 0.01, 5 + time * 0.01);
+                std::thread sphere_thread(draw_sphere, *sphere, std::ref(screen), wava_out, 0 + time * 0.01, 5 + time * 0.01);
                 threads.push_back(std::move(sphere_thread));
                 }
             break;
@@ -42,8 +42,8 @@ void render_cli_frame (std::vector<Shape*> shapes, wava_screen &screen, std::vec
     }
     
     printf("\x1b[H"); // brings cursor to beginning of terminal window
-    for (int x = 0; x < screen.x_dim(); ++x) {
-        for (int y = 0; y < screen.y_dim(); ++y) {
+    for (int x = 0; x < screen.x; x++) {
+        for (int y = 0; y < screen.y; y++) {
             int curr_index = screen.get_index(x, y);
 
             ColorTag curr_tag = screen.output[curr_index];
@@ -60,14 +60,9 @@ void render_cli_frame (std::vector<Shape*> shapes, wava_screen &screen, std::vec
             }
 
             if (luminance <= 0.01 && (color == Color(0, 0, 0))) { 
-                int largest = 0;
                 for (int i = 0; i < 12; i++) {
-                    if (wava_out[i + 3] > wava_out[largest]) largest = i; 
                     color = wava_out[i + 3] * screen.bg_palette.colors[i % screen.bg_palette.colors.size()] + color;
                 }
-                //for (int i = 0; i < screen.bg_palette.colors.size(); i++) {
-                //    color = wava_out[i + 3] * screen.bg_palette.colors[i] + color;
-                //}
             }
             
             if (luminance > 0) 
@@ -94,5 +89,5 @@ void render_cli_frame (std::vector<Shape*> shapes, wava_screen &screen, std::vec
         }
         printf ("\n");
     }
-    time++;
+    time+=1*(wava_out[0]*2+1);
 }

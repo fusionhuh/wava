@@ -1,10 +1,9 @@
-#include "pulse.h"
-#include "common.h"
+#include <pulse.h>
+#include <common.h>
 
 #include <pulse/error.h>
 #include <pulse/pulseaudio.h>
 #include <pulse/simple.h>
-#include <wavatransform.h>
 
 pa_mainloop *m_pulseaudio_mainloop;
 
@@ -35,19 +34,14 @@ void pulseaudio_context_state_callback(pa_context *pulseaudio_context, void *use
     // make sure loop is ready
     switch (pa_context_get_state(pulseaudio_context)) {
     case PA_CONTEXT_UNCONNECTED:
-        // printf("UNCONNECTED\n");
         break;
     case PA_CONTEXT_CONNECTING:
-        // printf("CONNECTING\n");
         break;
     case PA_CONTEXT_AUTHORIZING:
-        // printf("AUTHORIZING\n");
         break;
     case PA_CONTEXT_SETTING_NAME:
-        // printf("SETTING_NAME\n");
         break;
     case PA_CONTEXT_READY: // extract default sink name
-        // printf("READY\n");
         pa_operation_unref(pa_context_get_server_info(pulseaudio_context, cb, userdata));
         break;
     case PA_CONTEXT_FAILED:
@@ -55,7 +49,6 @@ void pulseaudio_context_state_callback(pa_context *pulseaudio_context, void *use
         exit(EXIT_FAILURE);
         break;
     case PA_CONTEXT_TERMINATED:
-        // printf("TERMINATED\n");
         pa_mainloop_quit(m_pulseaudio_mainloop, 0);
         break;
     }
@@ -76,8 +69,6 @@ void get_pulse_default_sink(void *data) {
 
     // This function connects to the pulse server
     pa_context_connect(pulseaudio_context, NULL, PA_CONTEXT_NOFLAGS, NULL);
-
-    //        printf("connecting to server\n");
 
     // This function defines a callback so the server will tell us its state.
     pa_context_set_state_callback(pulseaudio_context, pulseaudio_context_state_callback,
@@ -100,7 +91,6 @@ void get_pulse_default_sink(void *data) {
 }
 
 void *input_pulse(void *data) {
-
     struct audio_data *audio = (struct audio_data *)data;
     uint16_t frames = audio->input_buffer_size/2;
     int channels = 2;

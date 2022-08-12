@@ -7,38 +7,100 @@
 #include <string>
 #include <thread>
 #include <mutex>
+#include <quick_arg_parser.hpp>
 
 #include <pulse/context.h>
 #include <pulse/introspect.h>
 #include <pulse/mainloop.h>
 #include <pulse/stream.h>
 
+#include <libconfig.h++>
+
 #include <fftw3.h>
 
 #include <common.h>
 #include <pulse.h>
 
-#include <wavatransform.h>
+#include <wavatransform.hpp>
 
-#include <graphics.h>
-#include <cli.h>
+#include <graphics.hpp>
+#include <cli.hpp>
 
-// PRIORITIES AND NOTES AT THE MOMENT:
+// Credit to: https://github.com/Dugy/quick_arg_parser
 
-// Might want to look into monstercat filter?
+using namespace libconfig;
 
-int main(int argc, char **argv)
-{
+struct RenderingArgs : MainArguments<RenderingArgs> {
+	int donut_count = option("donuts", 'd', "Number of donuts to be rendered.") = 0;
+	int sphere_count = option("spheres", 's', "Number of spheres to be rendered.") = 0;
+	int rect_prism_count = option("rect_prisms", 'r', "Number of rectangular prisms to be rendered.") = 0;
+	
+	int shape_palette = option("shape_palette", 'x', "Color palette for background.") = PRIDE_FLAG_PALETTE;
+
+	float phi_spacing = option("phi_spacing") = 0.9;
+	float theta_spacing = option("theta_spacing") = 0.9;
+	float prism_spacing = option("prism_spacing") = 0.9;
+
+	int light_smoothness = option("light_smoothness") = -1;
+
+	int bg_palette = option("bg_palette", 'y', "Color palette for background.") = PRIDE_FLAG_PALETTE;
+
+	bool ignore_config = option("ignore_config", 'i');
+
+};
+
+// Things to do tomorrow:
+
+// Add support for config files
+
+// Add support for keystrokes
+
+int main(int argc, char** argv) {
 	srand(time(0)); // set rand() seed
-	int time = 0;
+	
+	RenderingArgs render_args{{argc, argv}};
+
+	Config wava_cfg;
+	//wava_cfg.setOptions(Config::OptionAllowScientificNotation); // only works in 1.7
+
+	try {
+		std::string path = std::string(getenv("HOME")) + std::string("/.config/wava/wava.cfg");
+		wava_cfg.readFile(path.c_str());
+	}
+	catch(const FileIOException &fioex) {
+		std::cerr << "Error occurred while reading config file, it may be missing. Try reinstalling program." << std::endl;
+		exit(-1);
+	}
+	catch(const ParseException &pex) {
+		std::cerr << "Error occurred while parsing config gile." << std::endl;
+		exit(-1);
+	}
 
 	// main loop	
 	while (true) {
-		// LOAD CONFIG VALUES
+
+		// Load config values
+		if (!render_args.ignore_config) {
+			try {
+				render_args.phi_spacing = wava_cfg.lookup("rendering.phi_spacing");
+				render_args.theta_spacing = wava_cfg.lookup("rendering.theta_spacing");
+				render_args.prism_spacing = wava_cfg.lookup("rendering.prism_spacing");
+				render_args.light_smoothness = wava_cfg.lookup("rendering.light_smoothness");
+				render_args.bg_palette = wava_cfg.lookup("rendering.bg_palette");
+
+				render_args.donut_count = wava_cfg.lookup("shapes.donut_count");
+				render_args.sphere_count = wava_cfg.lookup("shapes.sphere_count");
+				render_args.rect_prism_count = wava_cfg.lookup("shapes.rect_prism_count");
+				render_args.shape_palette = wava_cfg.lookup("shapes.shape_palette");
+			}
+			catch(const SettingNotFoundException &nfex) {
+				std::cerr << "Error occurred while doing lookup for setting." << std::endl;
+				exit(-1);
+			}
+		}
+
 		std::vector<Shape*> shapes = generate_rand_shapes(1, 0, wava_plan::freq_bands);
 
-		wava_screen::light_smoothness = 8;
-		// config values end
 
 		struct audio_data audio;
 		memset(&audio, 0, sizeof(audio));
@@ -71,33 +133,31 @@ int main(int argc, char **argv)
 		//break
 
 		while (true) { // while (!reloadConf) 
-			int curr_screen_x = 40; 
-			int curr_screen_y = 40; // could be changed in next loop
+			int screen_x = 40; 
+			int screen_y = 40; // could be changed in next loop
 
-			struct wava_plan plan = wava_init(44100, 2, 0.77, 50, 10000);
+			struct wava_plan plan(44100, 2, 0.77, 50, 10000);
 
-			wava_screen screen(curr_screen_x, curr_screen_y);
+			wava_screen screen(screen_x, screen_y, render_args.theta_spacing, render_args.phi_spacing, render_args.prism_spacing,
+				render_args.light_smoothness, render_args.bg_palette);
+
 			while (true) { // while (!resizeTerminal)
 				pthread_mutex_lock(&audio.lock);
 				std::vector<double> wava_out = wava_execute(audio.wava_in, audio.samples_counter, plan);
-				normalize_vector(wava_out);
 
 				if (audio.samples_counter > 0) audio.samples_counter = 0;
 				pthread_mutex_unlock(&audio.lock);
 
-				/*for (int i = 0; i < 15; i++) {
-					printf("freq band %d: %f\n", i, wava_out[i]);
-				}
-				printf("\x1b[H");*/
 				render_cli_frame(shapes, screen, wava_out);
-				//printf("base is: %f mid is: %f treble is: %f\n", wava_out[0] * 1.25, wava_out[1], wava_out[2]);
+				
+
 				usleep(1000); // NEED this or some kind of delay to get results that make sense apparently
-				time++;        
-			}	
-			exit(-1);
+			}
+
 		}
 
 		for (int i = 0; i < shapes.size(); i++) delete shapes[i];
+		delete [] audio.wava_in;
 	}
 	return 0;
 }

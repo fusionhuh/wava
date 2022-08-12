@@ -1,6 +1,4 @@
-#ifndef WAVA_GRAPHICS
-#define WAVA_GRAPHICS
-
+#pragma once
 #include <vector>
 #include <mutex>
 #include <string>
@@ -15,6 +13,7 @@
 #define TRIANGLE_SHAPE 6
 #define WAVA_SHAPE_COUNT 7
 
+#define RAND_PALETTE
 #define PRIDE_FLAG_PALETTE 0
 #define TRANS_FLAG_PALETTE 1
 #define EERIE_PALETTE 2
@@ -29,9 +28,6 @@
 #ifndef PI
 #define PI 3.14159265359
 #endif
-#define THETA_SPACING 1
-#define PHI_SPACING 0.1
-#define PRISM_SPACING 0.041
 
 struct vec3
 {
@@ -40,8 +36,8 @@ struct vec3
     vec3 operator+(const vec3& vec);
     vec3 operator-(const vec3& vec);
 
-    vec3 operator*(const float& scalar);
-    vec3 operator/(const float& scalar);
+    vec3 operator*(float scalar);
+    vec3 operator/(float scalar);
 
     float operator*(const vec3& vec);
 
@@ -69,7 +65,7 @@ vec3 operator*(vec3 vec, matrix3 mat);
 
 void normalize_vector(std::vector<double>& vec);
 
-double operator*(std::vector<double> vec1, std::vector<double> vec2);
+double operator*(const std::vector<double>& vec1, const std::vector<double>& vec2);
 
 // shapes/colors portion
 struct Color {
@@ -92,14 +88,14 @@ struct ColorTag {
     float luminance;
 
 	ColorTag();
-	ColorTag(Color color, float luminance);
+	ColorTag(const Color& color, float luminance);
 };
 
 struct ColorPalette {
 	std::string name;
-	std::vector<Color> colors;
-
 	bool symmetric;
+
+	std::vector<Color> colors;
 };
 
 struct Shape {
@@ -126,7 +122,7 @@ struct TriPrism : public Shape {
 
 struct Sphere : public Shape {
 	float radius;
-	std::vector<float> radius_weighting_function;
+	std::vector<double> radius_weighting_function;
 
 	int get_shape_type();
 };
@@ -140,9 +136,7 @@ struct Donut : public Shape {
 
 struct RectPrism : public Shape {
 	float height, width, depth;
-	std::vector<float> length_weighting_function;
-	std::vector<float> width_weighting_function;
-	std::vector<float> depth_weighting_function;
+	std::vector<double> volume_weighting_function;
 
 	int get_shape_type();
 };
@@ -169,26 +163,26 @@ struct Triangle : public Shape {
 };
 
 struct wava_screen {
-	private:
-		int x, y;
-		std::mutex mtx; 
+	const int x, y;
+	std::mutex mtx; 
 
-		float K1, K2, R1, R2;
+	float K1, K2, R1, R2;
 
-		std::string background_print_str;
-		std::string shape_print_str;
+	const std::string background_print_str;
+	const std::string shape_print_str;
+
+	const int bg_palette_index;
+
+	const float theta_spacing, phi_spacing, prism_spacing;
+	
+	ColorPalette bg_palette;
 
 	public:
 		static vec3 light;
-		static float light_smoothness;
+		const float light_smoothness;
 
-		ColorPalette bg_palette;
+		wava_screen(int x, int y, float theta, float phi, float rect, float smoothness, int palette_index);
 
-		wava_screen(int x, int y);
-
-		int x_dim();
-		int y_dim();
-	
 		std::vector<double> zbuffer;
 		std::vector<ColorTag> output;
 
@@ -205,12 +199,11 @@ struct wava_screen {
 
 void draw_donut (Donut donut, wava_screen &screen, std::vector<double> wava_out, float A, float B);
 
-void draw_sphere (Sphere sphere, wava_screen &screen, std::vector<double> weighting_coefficients, float A, float B);
+void draw_sphere (Sphere sphere, wava_screen &screen, std::vector<double> wava_out, float A, float B);
 
-void draw_rect_prism (RectPrism rect_prism, wava_screen &screen, std::vector<double> weighting_coefficients, float A, float B);
+void draw_rect_prism (RectPrism rect_prism, wava_screen &screen, std::vector<double> wava_out, float A, float B);
 
 std::vector<Shape*> generate_rand_shapes(int count, float variance, int freq_bands);
 
 ColorPalette generate_rand_palette();
 
-#endif

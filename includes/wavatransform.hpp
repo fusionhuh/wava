@@ -1,11 +1,14 @@
-#ifndef WAVA_TRANSFORM
-#define WAVA_TRANSFORM
+#pragma once
 #ifndef PI
 #define PI 3.1415926535897932385
 #endif
+#define FFT_OUT_SIZE 8192
+#define FFT_IN_SIZE 16384
+
 #include <stdint.h>
 #include <fftw3.h>
 #include <vector>
+
 
 struct wava_plan {
 	int fft_buffer_size;
@@ -45,12 +48,13 @@ struct wava_plan {
 
 	static double band_lower_cutoff_freq[15];
 	static double band_upper_cutoff_freq[15];
-	static double band_harmonics_count[15];
 
 	double prev_wava_out[15];
 
 	int screen_x;
 	int screen_y;
+
+	wava_plan(unsigned int rate, int channels, double noise_reduction, int low_cut_off, int high_cut_off);
 
 	~wava_plan();
 };
@@ -58,6 +62,4 @@ struct wava_plan {
 struct wava_plan wava_init(unsigned int rate, int channels, double noise_reduction, int low_cut_off, int high_cut_off);
 
 std::vector<double> wava_execute(double* wava_in, int new_samples, struct wava_plan &plan);
-
-#endif
 
