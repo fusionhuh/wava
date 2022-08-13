@@ -17,7 +17,7 @@ to build, wava requires FFTW and Pulseaudio/ALSA dev files.
 
 to install all required dependenecies, simply run
 ```
-sudo apt-get install -y libpulseaudio-dev libasound2-dev libfftw3-dev
+sudo apt-get install -y libpulseaudio-dev libasound2-dev libfftw3-dev libconfig++-dev
 ```
 in your terminal on Ubuntu/Debian systems.
 
