@@ -5,6 +5,7 @@
 #include <mutex>
 #include <thread>
 #include <iostream>
+#include <stdlib.h>
 
 #include <graphics.hpp>
 
@@ -36,6 +37,11 @@ ColorTag::ColorTag(const Color& color, float lum) : luminance(lum) { this->color
 Color Shape::calculate_corresponding_color(float normalized_val) {
     int palette_size = palette.colors.size();
 
+    if (highlight) {
+        unsigned char val = rand() % 256;
+        return Color(val, val, val);
+    }
+
     if (palette.symmetric) {
         int palette_index = normalized_val * (palette_size + ((int) ((palette_size/2) + 1)));
         if (palette_index == (palette_size + ((int) (palette_size/2) + 1))) palette_index--;
@@ -56,9 +62,24 @@ int TriPrism::get_shape_type() { return TRI_PRISM_SHAPE; }
 int Sphere::get_shape_type() { return SPHERE_SHAPE; }
 int Donut::get_shape_type() { return DONUT_SHAPE; }
 int RectPrism::get_shape_type() { return RECT_PRISM_SHAPE; }
-int Circle::get_shape_type() { return CIRCLE_SHAPE; }
-int Disc::get_shape_type() { return DISC_SHAPE; }
 int Triangle::get_shape_type() { return TRIANGLE_SHAPE; }
+
+void Shape::increase_size() {}
+void Donut::increase_size() { radius+=0.05; thickness+=0.02; }
+void Sphere::increase_size() { radius+=0.05; }
+void RectPrism::increase_size() { width+=0.05; depth+=0.05; height+=0.05; }
+
+void Shape::decrease_size() {}
+void Donut::decrease_size() {
+    if (radius >= 0.1) radius-=0.05;
+    if (thickness >= 0.04) thickness-=0.02;
+}
+void Sphere::decrease_size() {
+    if (radius >= 0.1) radius-=0.05;
+}
+void RectPrism::decrease_size() {
+    if (width >= 0.1) { width-=0.05; depth-=0.05; height-=0.05; }
+}
 
 ColorPalette generate_palette(int index) {
     if (index == -1) index = rand() % WAVA_PALETTE_COUNT;
@@ -88,11 +109,36 @@ ColorPalette generate_palette(int index) {
         default:
         {
             std::cerr << "Invalid palette color specified, defaulting to pride.";
-            return generate_palette(1);
+            return generate_palette(0);
         }
         break;
     }
     return palette;
+}
+
+Shape::Shape(float x_offset, float y_offset, float base_luminance, int freq_bands, int color_index, int shape_type) :
+    x_offset(x_offset), y_offset(y_offset), base_luminance(base_luminance), velocity(0), highlight(false), shape_type(shape_type)
+{
+    luminance_weighting_function = std::vector<double>(freq_bands);
+    palette = generate_palette(color_index);
+}
+
+Donut::Donut(float radius, float thickness, float x_offset, float y_offset, float base_luminance, int freq_bands, int color_index) :
+    radius(radius), thickness(thickness), Shape(x_offset, y_offset, base_luminance, freq_bands, color_index, DONUT_SHAPE)
+{
+    
+}
+
+Sphere::Sphere(float radius, float x_offset, float y_offset, float base_luminance, int freq_bands, int color_index) :
+    radius(radius), Shape(x_offset, y_offset, base_luminance, freq_bands, color_index, SPHERE_SHAPE)
+{
+
+}
+
+RectPrism::RectPrism(float height, float width, float depth, float x_offset, float y_offset, float base_luminance, int freq_bands, int color_index) :
+    height(height), width(width), depth(depth), Shape(x_offset, y_offset, base_luminance, freq_bands, color_index, RECT_PRISM_SHAPE)
+{
+
 }
 
 void normalize_vector(std::vector<double>& vec) {
@@ -111,72 +157,42 @@ double operator*(const std::vector<double>& vec1, const std::vector<double>& vec
 	return dot;
 }
 
-std::vector<Shape*> generate_rand_shapes(int count, float variance, int freq_bands) {
+std::vector<Shape*> generate_shapes(int donut_count, int sphere_count, int rect_prism_count, float variance, int freq_bands, int color_index) {
     std::vector<Shape*> shapes;
-    for (int i = 0; i < count; ++i) {
-        int shape_type = rand() % 3;
-        switch(DONUT_SHAPE) {
-            case RECT_PRISM_SHAPE:
-            {
-                RectPrism* rect_prism = new RectPrism();
-                rect_prism->height = 1.5;
-                rect_prism->width = 1.5;
-                rect_prism->depth = 1.5;
 
-                rect_prism->base_luminance = 1.1;
+    for (int i = 0; i < donut_count; i++) {
+        Donut* donut = new Donut(0.5, 0.2, 0, 0, 2, freq_bands, color_index);
 
-                rect_prism->palette = generate_palette(-1);
+        donut->radius_weighting_function = std::vector<double>(freq_bands);
+        donut->radius_weighting_function[0] = 1;
+        donut->thickness_weighting_function = std::vector<double>(freq_bands);
+        donut->thickness_weighting_function[0] = 1;
+        donut->luminance_weighting_function = std::vector<double>(freq_bands);
+        donut->luminance_weighting_function[0] = 1;
 
-                rect_prism->volume_weighting_function = std::vector<double>(freq_bands);
-                rect_prism->volume_weighting_function[0] = 1;
-                rect_prism->luminance_weighting_function = std::vector<double>(freq_bands);
-                rect_prism->luminance_weighting_function[0] = 1;
+        shapes.push_back(donut);
+    }
+    for (int i = 0; i < sphere_count; i++) {
+        Sphere* sphere = new Sphere(0.5, 0, 0, 2, freq_bands, color_index);
 
-                shapes.push_back(rect_prism);
-            }
-            break;
-            case SPHERE_SHAPE:
-            {
-                Sphere* sphere = new Sphere();
-                sphere->radius = 1.0;
+        sphere->highlight = false;
 
-                sphere->base_luminance = 1.2;
+        sphere->radius_weighting_function = std::vector<double>(freq_bands);
+        sphere->radius_weighting_function[0] = 0.5;
+        sphere->luminance_weighting_function = std::vector<double>(freq_bands);
+        sphere->luminance_weighting_function[0] = 1;
 
-                sphere->palette = generate_palette(-1);
+        shapes.push_back(sphere);
+    }
+    for (int i = 0; i < rect_prism_count; i++) {
+        RectPrism* rect_prism = new RectPrism(1, 1, 1, 0, 0, 2, freq_bands, color_index);
 
-                sphere->radius_weighting_function = std::vector<double>(freq_bands);
-                sphere->radius_weighting_function[0] = 0.5;
-                sphere->luminance_weighting_function = std::vector<double>(freq_bands);
-                sphere->luminance_weighting_function[0] = 1;
+        rect_prism->volume_weighting_function = std::vector<double>(freq_bands);
+        rect_prism->volume_weighting_function[0] = 1;
+        rect_prism->luminance_weighting_function = std::vector<double>(freq_bands);
+        rect_prism->luminance_weighting_function[0] = 1;
 
-                shapes.push_back(sphere);
-            }
-            break;
-            case DONUT_SHAPE:
-            {
-                Donut* donut = new Donut();
-                donut->radius = 0.5;
-                donut->thickness = 0.25;
-
-                donut->base_luminance = 2;
-
-                donut->palette = generate_palette(-1);
-
-                donut->radius_weighting_function = std::vector<double>(freq_bands);
-                donut->radius_weighting_function[0] = 1;
-                donut->thickness_weighting_function = std::vector<double>(freq_bands);
-                donut->thickness_weighting_function[0] = 1;
-                donut->luminance_weighting_function = std::vector<double>(freq_bands);
-                donut->luminance_weighting_function[0] = 1;
-
-                shapes.push_back(donut);
-            }
-            break;
-            default:
-                fputs("Invalid shape type generated.", stderr);
-                exit(-1);
-            break;
-        }
+        shapes.push_back(rect_prism);
     }
 
     return shapes;
@@ -294,6 +310,9 @@ void wava_screen::write_to_z_buffer_and_output(const float* zbuffer, const Color
 vec3 operator*(vec3 vec, matrix3 mat) { return { vec * mat.col_one, vec * mat.col_two, vec * mat.col_three }; }
 
 void draw_donut (Donut donut, wava_screen &screen, std::vector<double> wava_out, float A, float B) {
+    double theta_spacing = (donut.highlight) ? THETA_SPACING : screen.theta_spacing;
+    double phi_spacing = (donut.highlight) ? PHI_SPACING : screen.phi_spacing;
+
     double radius_increase = (donut.radius_weighting_function * wava_out * 0.5) + 1;
     double thickness_increase = (donut.thickness_weighting_function * wava_out) + 1;
     double luminance_increase = (donut.luminance_weighting_function * wava_out * 2) + 1;
@@ -311,13 +330,15 @@ void draw_donut (Donut donut, wava_screen &screen, std::vector<double> wava_out,
     ColorTag curr_tag;
 
     float log2_inverse = 1/log(2.0);
-    for (float theta=0; theta < 2*PI; theta += screen.theta_spacing) {
-        for (float phi=0; phi < 2*PI; phi += screen.phi_spacing) {
+    for (float theta=0; theta < 2*PI; theta += theta_spacing) {
+        for (float phi=0; phi < 2*PI; phi += phi_spacing) {
             vec3 pos = { radius + thickness * cos(theta) + 1, thickness * sin(theta), 0.0001 }; // setting z to small num to avoid NaN with 1/z
 
             matrix3 matrix_y = matrix3 ('y', phi);
 
             vec3 transformed_pos = pos * matrix_y * matrix_x * matrix_z;
+
+            transformed_pos = transformed_pos + vec3 { donut.x_offset, donut.y_offset, 0 };
             
             std::tuple<int, int, float> coord = screen.calculate_proj_coord(transformed_pos);
             int xp = std::get<0>(coord), yp = std::get<1>(coord);
@@ -351,6 +372,9 @@ void draw_donut (Donut donut, wava_screen &screen, std::vector<double> wava_out,
 }
 
 void draw_sphere (Sphere sphere, wava_screen &screen, std::vector<double> wava_out, float A, float B) {
+    double theta_spacing = (sphere.highlight) ? THETA_SPACING : screen.theta_spacing;
+    double phi_spacing = (sphere.highlight) ? PHI_SPACING : screen.phi_spacing;
+
     double radius_increase = (sphere.radius_weighting_function * wava_out) + 1;
     double luminance_increase = (sphere.luminance_weighting_function * wava_out) + 1;
     
@@ -365,8 +389,8 @@ void draw_sphere (Sphere sphere, wava_screen &screen, std::vector<double> wava_o
     ColorTag curr_tag;
 
     float log2_inverse = 1/log(2.0);
-    for (float theta = 0; theta < 2*PI; theta += screen.theta_spacing) {
-        for (float phi = 0; phi < 1*PI; phi += screen.phi_spacing) {
+    for (float theta = 0; theta < 2*PI; theta += theta_spacing) {
+        for (float phi = 0; phi < 1*PI; phi += phi_spacing) {
             vec3 pos = {radius * cos (theta), radius * sin (theta), 0.00000001};
 
             matrix3 matrix_y = matrix3 ('y', phi);
@@ -375,6 +399,8 @@ void draw_sphere (Sphere sphere, wava_screen &screen, std::vector<double> wava_o
 
             vec3 normal = transformed_pos;
             normal.normalize();
+
+            transformed_pos = transformed_pos + vec3 { sphere.x_offset, sphere.y_offset, 0 };
 
             std::tuple<int, int, float> coord = screen.calculate_proj_coord(transformed_pos);
             int xp = std::get<0>(coord), yp = std::get<1>(coord);
@@ -406,6 +432,8 @@ void draw_sphere (Sphere sphere, wava_screen &screen, std::vector<double> wava_o
 }
 
 void draw_rect_prism (RectPrism rect_prism, wava_screen& screen, std::vector<double> wava_out, float A, float B) {
+    double prism_spacing = (rect_prism.highlight) ? PRISM_SPACING : screen.prism_spacing;
+
     double volume_increase = (rect_prism.volume_weighting_function * wava_out * 0.5) + 1;
     double luminance_increase = (rect_prism.luminance_weighting_function * wava_out) + 1;
 
@@ -423,8 +451,8 @@ void draw_rect_prism (RectPrism rect_prism, wava_screen& screen, std::vector<dou
     ColorTag curr_tag;
 
     float log2_inverse = 1/log(2.0);
-    for (float x = 0; x < width; x += screen.prism_spacing) {
-        for (float y = 0; y < height; y += screen.prism_spacing) {
+    for (float x = 0; x < width; x += prism_spacing) {
+        for (float y = 0; y < height; y += prism_spacing) {
             vec3 side1_front { x, y, 0 };
             vec3 side1_back { x, y, depth };
 
@@ -439,6 +467,8 @@ void draw_rect_prism (RectPrism rect_prism, wava_screen& screen, std::vector<dou
                 vec3 transformed_pos = curr_points[i] - (vec3) {width/2, height/2, depth/2};
                 transformed_pos = transformed_pos * matrix_x * matrix_z;
                 transformed_pos = transformed_pos + (vec3) {0, 0, 0.0000000001};
+
+                transformed_pos = transformed_pos + vec3 { rect_prism.x_offset, rect_prism.y_offset, 0 };
 
                 vec3 normal; 
                 switch (i) 

@@ -4,6 +4,10 @@
 #include <string>
 
 // color/shapes portion
+#define PHI_SPACING 0.05
+#define THETA_SPACING 0.05
+#define PRISM_SPACING 0.05
+
 #define RECT_PRISM_SHAPE 0
 #define SPHERE_SHAPE 1
 #define DONUT_SHAPE 2
@@ -102,14 +106,23 @@ struct Shape {
 	ColorPalette palette;
 	Color calculate_corresponding_color(float normalized_val /*decimal number ranging from 0 to 1*/);
 
-	float base_luminance;
-	float velocity; // rate of translational movement
-	int x_offset;
-	int y_offset;
+	const int shape_type;
+
+	const float base_luminance;
+	const float velocity; // rate of translational movement
+	const float x_offset;
+	const float y_offset;
+
+	bool highlight;
 
 	std::vector<double> luminance_weighting_function;
 
 	virtual int get_shape_type();
+
+	virtual void decrease_size();
+	virtual void increase_size();
+
+	Shape(float x_offset, float y_offset, float base_luminance, int freq_bands, int color_index, int shape_type);
 };
 
 struct TriPrism : public Shape {
@@ -118,6 +131,7 @@ struct TriPrism : public Shape {
 	std::vector<float> height_weighting_function;
 
 	int get_shape_type();
+
 };
 
 struct Sphere : public Shape {
@@ -125,39 +139,42 @@ struct Sphere : public Shape {
 	std::vector<double> radius_weighting_function;
 
 	int get_shape_type();
+
+	void decrease_size();
+	void increase_size();
+
+	Sphere(float radius, float x_offset, float y_offset, float base_luminance, int freq_bands, int color_index);
 };
 
 struct Donut : public Shape {
 	float radius, thickness;
 	std::vector<double> radius_weighting_function, thickness_weighting_function;
 
+	void decrease_size();
+	void increase_size();
+
 	int get_shape_type();
+
+	Donut(float radius, float thickness, float x_offset, float y_offset, float base_luminance, int freq_bands, int color_index);
 };
 
 struct RectPrism : public Shape {
 	float height, width, depth;
 	std::vector<double> volume_weighting_function;
 
-	int get_shape_type();
-};
-
-struct Circle : public Shape {
-	float radius;
-	std::vector<float> radius_weighting_function;
+	void decrease_size();
+	void increase_size();
 
 	int get_shape_type();
-};
 
-struct Disc : public Shape {
-	float radius, thickness;
-	std::vector<float> radius_weighting_function;
-	std::vector<float> thickness_weighting_function;
-
-	int get_shape_type();
+	RectPrism(float height, float width, float depth, float x_offset, float y_offset, float base_luminance, int freq_bands, int color_index);
 };
 
 struct Triangle : public Shape {
 	float side1, side2, side3;
+
+	void decrease_size();
+	void increase_size();	
 
 	int get_shape_type();
 };
@@ -203,7 +220,5 @@ void draw_sphere (Sphere sphere, wava_screen &screen, std::vector<double> wava_o
 
 void draw_rect_prism (RectPrism rect_prism, wava_screen &screen, std::vector<double> wava_out, float A, float B);
 
-std::vector<Shape*> generate_rand_shapes(int count, float variance, int freq_bands);
-
-ColorPalette generate_rand_palette();
+std::vector<Shape*> generate_shapes(int donut_count, int sphere_count, int rect_prism_count, float variance, int freq_bands, int color_index);
 

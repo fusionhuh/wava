@@ -57,10 +57,14 @@ wava_plan::~wava_plan() {
 	fftw_free(l_sample_data_raw);	
 	fftw_free(l_output_data);
 
+	fftw_destroy_plan(plan_left);
+
 	if (audio_channels == 2) {
 		fftw_free(r_sample_data);
 		fftw_free(r_sample_data_raw);
 		fftw_free(r_output_data);
+
+		fftw_destroy_plan(plan_right);
 	}
 }
 

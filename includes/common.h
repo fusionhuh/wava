@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <mutex>
 
 // number of samples to read from audio source per channel
 #define BUFFER_SIZE 512
@@ -27,6 +28,11 @@ struct audio_data {
     char error_message[1024];
     int samples_counter;
     pthread_mutex_t lock;
+    std::mutex mtx;
+
+    audio_data(int channels, int rate);
+
+    ~audio_data();
 };
 
 void reset_output_buffers(struct audio_data *data);

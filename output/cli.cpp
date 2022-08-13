@@ -1,5 +1,6 @@
 #include <thread>
 #include <cli.hpp>
+#include <colors.hpp>
 
 void render_cli_frame (std::vector<Shape*> shapes, wava_screen &screen, std::vector<double> wava_out) {
     static int time = 0;
@@ -10,7 +11,6 @@ void render_cli_frame (std::vector<Shape*> shapes, wava_screen &screen, std::vec
             case DONUT_SHAPE:
                 {
                 Donut* donut = (Donut*) shapes[i];
-
                 std::thread donut_thread(draw_donut, *donut, std::ref(screen), wava_out, 0 + time * 0.005, 5 + time * 0.005);
                 threads.push_back(std::move(donut_thread));
                 }
@@ -25,7 +25,6 @@ void render_cli_frame (std::vector<Shape*> shapes, wava_screen &screen, std::vec
             case SPHERE_SHAPE:
                 {
                 Sphere* sphere = (Sphere*) shapes[i];
-                //draw_sphere(*sphere, screen, weighting, 0 + time * 0.01, 5 + time * 0.01);
                 std::thread sphere_thread(draw_sphere, *sphere, std::ref(screen), wava_out, 0 + time * 0.01, 5 + time * 0.01);
                 threads.push_back(std::move(sphere_thread));
                 }
@@ -42,6 +41,7 @@ void render_cli_frame (std::vector<Shape*> shapes, wava_screen &screen, std::vec
     }
     
     printf("\x1b[H"); // brings cursor to beginning of terminal window
+    float inverse_smoothness = 1/screen.light_smoothness;
     for (int x = 0; x < screen.x; x++) {
         for (int y = 0; y < screen.y; y++) {
             int curr_index = screen.get_index(x, y);
@@ -55,7 +55,7 @@ void render_cli_frame (std::vector<Shape*> shapes, wava_screen &screen, std::vec
                 //printf("luminance is: %f", luminance);
                 int temp = (int) luminance;
                 //printf("temp is %d", temp);
-                luminance = (float) (temp/screen.light_smoothness);
+                luminance = (float) (temp*inverse_smoothness);
                 //printf("luminance is %f\n", luminance);
             }
 
