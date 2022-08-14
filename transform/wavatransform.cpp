@@ -204,7 +204,6 @@ std::vector<double> wava_execute(double* wava_in, int new_samples, wava_plan &pl
 		if (wava_out[i] < plan.prev_wava_out[i] && (plan.prev_wava_out[i] - wava_out[i]) > 0.001 * plan.decay_rate) { wava_out[i] = plan.prev_wava_out[i] - 0.001*plan.decay_rate; }
 		plan.prev_wava_out[i] = wava_out[i];
 	}
-
 	
 	wava_out[0] = signal_energy/4;
 

@@ -42,13 +42,7 @@
 
 using namespace libconfig;
 
-struct RenderingArgs : MainArguments<RenderingArgs> {
-	int donut_count = option("donuts", 'd', "Number of donuts to be rendered.") = 0;
-	int sphere_count = option("spheres", 's', "Number of spheres to be rendered.") = 0;
-	int rect_prism_count = option("rect_prisms", 'r', "Number of rectangular prisms to be rendered.") = 0;
-	
-	int shape_palette = option("shape_palette", 'x', "Color palette for background.") = PRIDE_FLAG_PALETTE;
-
+struct WavaArgs : MainArguments<WavaArgs> {
 	float phi_spacing = option("phi_spacing") = 0.9;
 	float theta_spacing = option("theta_spacing") = 0.9;
 	float prism_spacing = option("prism_spacing") = 0.9;
@@ -59,15 +53,15 @@ struct RenderingArgs : MainArguments<RenderingArgs> {
 
 	bool ignore_config = option("ignore_config", 'i');
 
-	double noise_gate = option("noise_gate", 'X') = 50;
-	double boost = option("boost", 'Y') = 50;
-	double decay_rate = option("decay_rate", 'Z') = 50;
+	int noise_gate = option("noise_gate", 'X') = 50;
+	int boost = option("boost", 'Y') = 50;
+	int decay_rate = option("decay_rate", 'Z') = 50;
 };
 
 int main(int argc, char** argv) {
 	srand(time(0)); // set rand() seed
 	
-	RenderingArgs render_args{{argc, argv}};
+	WavaArgs wava_args{{argc, argv}};
 
 	Config wava_cfg;
 	//wava_cfg.setOptions(Config::OptionAllowScientificNotation); // only works in 1.7
@@ -134,17 +128,21 @@ int main(int argc, char** argv) {
 
 		// Load config values
 		std::vector<Shape*> shapes;
-		if (!render_args.ignore_config) {
+		if (!wava_args.ignore_config) {
 			try {
 				wava_cfg.readFile(path.c_str());
 
-				render_args.phi_spacing = wava_cfg.lookup("rendering.phi_spacing");
-				render_args.theta_spacing = wava_cfg.lookup("rendering.theta_spacing");
-				render_args.prism_spacing = wava_cfg.lookup("rendering.prism_spacing");
-				render_args.light_smoothness = wava_cfg.lookup("rendering.light_smoothness");
-				render_args.bg_palette = wava_cfg.lookup("rendering.bg_palette");
+				wava_args.phi_spacing = wava_cfg.lookup("rendering.phi_spacing");
+				wava_args.theta_spacing = wava_cfg.lookup("rendering.theta_spacing");
+				wava_args.prism_spacing = wava_cfg.lookup("rendering.prism_spacing");
+				wava_args.light_smoothness = wava_cfg.lookup("rendering.light_smoothness");
+				wava_args.bg_palette = wava_cfg.lookup("rendering.bg_palette");
 		
-				shapes = generate_shapes(wava_cfg.lookup("shapes_list"), wava_plan::freq_bands, render_args.shape_palette);
+				shapes = generate_shapes(wava_cfg.lookup("shapes_list"), wava_plan::freq_bands);
+
+				wava_args.noise_gate = wava_cfg.lookup("control.noise_gate");
+				wava_args.boost = wava_cfg.lookup("control.brightness");
+				wava_args.decay_rate = wava_cfg.lookup("control.decay_rate");
 			}
 			catch(const SettingNotFoundException &nfex) {
 				std::cerr << "Error occurred while doing lookup for setting." << std::endl;
@@ -152,8 +150,8 @@ int main(int argc, char** argv) {
 			}
 		}
 		else {
-			render_args.ignore_config = true;
-			shapes = generate_shapes(wava_cfg.lookup("shapes_list"), wava_plan::freq_bands, render_args.shape_palette);
+			wava_args.ignore_config = true;
+			//shapes = generate_shapes(wava_cfg.lookup("shapes_list"), wava_plan::freq_bands);
 		}
 
 		struct audio_data audio(2, 44100);
@@ -176,21 +174,18 @@ int main(int argc, char** argv) {
 			if (screen_x < 5) screen_x = 5; // avoids segfault with negative values
 			if (screen_y < 5) screen_y = 5;
 
-			if (render_args.phi_spacing < 0.04) render_args.phi_spacing = 0.04;
-			if (render_args.theta_spacing < 0.04) render_args.theta_spacing = 0.04;
-			if (render_args.prism_spacing < 0.04) render_args.prism_spacing = 0.04;
+			if (wava_args.phi_spacing < 0.04) wava_args.phi_spacing = 0.04;
+			if (wava_args.theta_spacing < 0.04) wava_args.theta_spacing = 0.04;
+			if (wava_args.prism_spacing < 0.04) wava_args.prism_spacing = 0.04;
 
-			if (render_args.light_smoothness > 100) render_args.light_smoothness = 100;
-			if (render_args.light_smoothness < 2) render_args.light_smoothness = 4;
+			if (wava_args.light_smoothness > 100) wava_args.light_smoothness = 100;
+			if (wava_args.light_smoothness < 2) wava_args.light_smoothness = 4;
 
-			if (render_args.bg_palette < 0) render_args.bg_palette = WAVA_PALETTE_COUNT - 1;
-			if (render_args.bg_palette == WAVA_PALETTE_COUNT) render_args.bg_palette = 0;
+			if (wava_args.bg_palette < 0) wava_args.bg_palette = WAVA_PALETTE_COUNT - 1;
+			if (wava_args.bg_palette == WAVA_PALETTE_COUNT) wava_args.bg_palette = 0;
 
-			if (render_args.shape_palette < 0) render_args.shape_palette = 0;
-			if (render_args.bg_palette == WAVA_PALETTE_COUNT) render_args.bg_palette--;
-
-			if (render_args.noise_gate < 0) render_args.noise_gate = 0;
-			if (render_args.noise_gate > 100) render_args.noise_gate = 100;
+			if (wava_args.noise_gate < 0) wava_args.noise_gate = 0;
+			if (wava_args.noise_gate > 100) wava_args.noise_gate = 100;
 
 			if (highlight_mode) {
 				if (shape_pointer >= shapes.size()) { 
@@ -213,10 +208,10 @@ int main(int argc, char** argv) {
 				}
 			}
 
-			struct wava_plan plan(44100, 2, render_args.noise_gate, render_args.boost, render_args.decay_rate);
+			struct wava_plan plan(44100, 2, wava_args.noise_gate, wava_args.boost, wava_args.decay_rate);
 
-			struct wava_screen screen(screen_y, screen_x, render_args.theta_spacing, render_args.phi_spacing, render_args.prism_spacing,
-				render_args.light_smoothness, render_args.bg_palette);
+			struct wava_screen screen(screen_y, screen_x, wava_args.theta_spacing, wava_args.phi_spacing, wava_args.prism_spacing,
+				wava_args.light_smoothness, wava_args.bg_palette);
 
 			bool change_screen_or_plan = false;
 			bool draw = true; // used to prevent bright flashing colors when changing render args
@@ -240,263 +235,263 @@ int main(int argc, char** argv) {
 						printf("Highlighting shape: %d\n", shape_pointer+1);
 						printf("Shape palette: %s\n", shapes[shape_pointer]->palette.name.c_str());
 					}
-            		printf("\x1b[48;2;%d;%d;%d;38;2;%d;%d;%dmNoise gate: %f\nEffective gate: %f\nBoost: %f\nDecay rate: %f\n", 0, 0, 0, 255, 255, 255,render_args.noise_gate, 1e7 * pow(1.25, render_args.noise_gate), render_args.boost, render_args.decay_rate);
+            		printf("\x1b[48;2;%d;%d;%d;38;2;%d;%d;%dmNoise gate: %d\nEffective gate: %f\nBrightness: %d\nDecay rate: %d\n", 0, 0, 0, 255, 255, 255,wava_args.noise_gate, 1e7 * pow(1.25, wava_args.noise_gate), wava_args.boost, wava_args.decay_rate);
 					std::cout << last_pressed_key_message;
 
 				}
 
-				// check for relevant keyboard inputs
 				int ch = quick_read();
-				if (!highlight_mode) {
-					switch (ch) {
-						case ERR: // do nothing
-							draw = true;
-							change_screen_or_plan = false;
-						break;
-						case RIGHT_ARROW: // increase screen_x
-							screen_x++;
-						break;
-						case DOWN_ARROW: // increase screen_y
-							screen_y++;
-						break;
-						case LEFT_ARROW: // decrease screen_x
-							screen_x--;
-						break;
-						case UP_ARROW: // decrease screen_y
-							screen_y--;
-						break;
-						case 'q': // increase detail on phi dimension
-							render_args.phi_spacing-=0.02;
-							last_pressed_key_message = std::string("Last key pressed: q, increase phi_detail");
-						break;
-						case 'a': // decrease detail on phi dimension
-							render_args.phi_spacing+=0.02;
-							last_pressed_key_message = std::string("Last key pressed: a, decrease phi_detail");
-						break;
-						case 'w': // increase detail on theta dimension
-							render_args.theta_spacing-=0.02;
-							last_pressed_key_message = std::string("Last key pressed: w, increase theta detail");
-						break;
-						case 's': // decrease detail on theta_dimension
-							render_args.theta_spacing+=0.02;
-							last_pressed_key_message = std::string("Last key pressed: s, decrease theta detail");
-						break;
-						case 'e':
-							render_args.prism_spacing-=0.02;
-							last_pressed_key_message = std::string("Last key pressed: e, increase prism detail");
-						break;
-						case 'd':
-							render_args.prism_spacing+=0.02;
-							last_pressed_key_message = std::string("Last key pressed: d, decrease prism detail");
-						break;
-						case 'r':
-							render_args.light_smoothness+=2;
-							last_pressed_key_message = std::string("Last key pressed: r, increase light smoothness");
-						break;
-						case 'f':
-							render_args.light_smoothness-=2;
-							last_pressed_key_message = std::string("Last key pressed: f, decrease light smoothness");
-						break;
-						case 'z':
-							render_args.bg_palette++;
-							last_pressed_key_message = std::string("Last key pressed: z, increment background color palette");
-						break;
-						case 'x':
-							render_args.bg_palette--;
-							last_pressed_key_message = std::string("Last key pressed: x, decrement background color palette");
-						break;
-						case 'R':
-							reload_config = true;
-							last_pressed_key_message = std::string("Last key pressed: R, reload config");
-						break;
-						case 'W':
-							{
-								// write to config
-								wava_cfg.lookup("rendering.bg_palette") = render_args.bg_palette;
-								wava_cfg.lookup("rendering.light_smoothness") = render_args.light_smoothness;
-								wava_cfg.lookup("rendering.phi_spacing") = render_args.phi_spacing;
-								wava_cfg.lookup("rendering.theta_spacing") = render_args.theta_spacing;
-								wava_cfg.lookup("rendering.prism_spacing") = render_args.prism_spacing;
-								last_pressed_key_message = std::string("Last key pressed: W, write to config");
+				switch (ch) { // for behavior common to both modes
+					case ERR:
+						draw = true;
+						change_screen_or_plan = false;
+					break;
+					case 'm':
+						mute = mute ? false : true;
+						last_pressed_key_message = std::string("Last key pressed: m, mute or unmute audio");
+						printf("\x1b[2J"); // clear screen
+					break;
+					case 'h':
+						hint = hint ? false : true;
+						last_pressed_key_message = std::string("Last key pressed: h, turn on hints");
+					break;
+					case ESC:
+						reload_config = true;
+						quit = true;
+					break;
+					default:
+						if (!highlight_mode) {
+							switch (ch) {
+								case RIGHT_ARROW: // increase screen_x
+									screen_x++;
+								break;
+								case DOWN_ARROW: // increase screen_y
+									screen_y++;
+								break;
+								case LEFT_ARROW: // decrease screen_x
+									screen_x--;
+								break;
+								case UP_ARROW: // decrease screen_y
+									screen_y--;
+								break;
+								case 'q': // increase detail on phi dimension
+									wava_args.phi_spacing-=0.02;
+									last_pressed_key_message = std::string("Last key pressed: q, increase phi_detail");
+								break;
+								case 'a': // decrease detail on phi dimension
+									wava_args.phi_spacing+=0.02;
+									last_pressed_key_message = std::string("Last key pressed: a, decrease phi_detail");
+								break;
+								case 'w': // increase detail on theta dimension
+									wava_args.theta_spacing-=0.02;
+									last_pressed_key_message = std::string("Last key pressed: w, increase theta detail");
+								break;
+								case 's': // decrease detail on theta_dimension
+									wava_args.theta_spacing+=0.02;
+									last_pressed_key_message = std::string("Last key pressed: s, decrease theta detail");
+								break;
+								case 'e':
+									wava_args.prism_spacing-=0.02;
+									last_pressed_key_message = std::string("Last key pressed: e, increase prism detail");
+								break;
+								case 'd':
+									wava_args.prism_spacing+=0.02;
+									last_pressed_key_message = std::string("Last key pressed: d, decrease prism detail");
+								break;
+								case 'r':
+									wava_args.light_smoothness+=2;
+									last_pressed_key_message = std::string("Last key pressed: r, increase light smoothness");
+								break;
+								case 'f':
+									wava_args.light_smoothness-=2;
+									last_pressed_key_message = std::string("Last key pressed: f, decrease light smoothness");
+								break;
+								case 'z':
+									wava_args.bg_palette++;
+									last_pressed_key_message = std::string("Last key pressed: z, increment background color palette");
+								break;
+								case 'x':
+									wava_args.bg_palette--;
+									last_pressed_key_message = std::string("Last key pressed: x, decrement background color palette");
+								break;
+								case 'R':
+									reload_config = true;
+									wava_args.ignore_config = false;
+									last_pressed_key_message = std::string("Last key pressed: R, reload config");
+								break;
+								case 'W':
+									{
+										// write to config
+										wava_cfg.lookup("rendering.bg_palette") = wava_args.bg_palette;
+										wava_cfg.lookup("rendering.light_smoothness") = wava_args.light_smoothness;
+										wava_cfg.lookup("rendering.phi_spacing") = wava_args.phi_spacing;
+										wava_cfg.lookup("rendering.theta_spacing") = wava_args.theta_spacing;
+										wava_cfg.lookup("rendering.prism_spacing") = wava_args.prism_spacing;
 
-								Setting& shapes_list = wava_cfg.lookup("shapes_list");
-								shapes_list.remove("list");
-								Setting& list = shapes_list.add("list", Setting::TypeList);
-								for (int i = 0; i < shapes.size(); i++) {
-									Setting& curr_shape_entry = list.add(Setting::TypeList);
-									switch(shapes[i]->shape_type) {
-										case SPHERE_SHAPE:
-											{
-												Sphere* sphere = (Sphere*) shapes[i];
-												curr_shape_entry.add(Setting::TypeInt) = SPHERE_SHAPE;
-												curr_shape_entry.add(Setting::TypeFloat) = sphere->radius;
-												curr_shape_entry.add(Setting::TypeFloat) = sphere->x_offset;
-												curr_shape_entry.add(Setting::TypeFloat) = sphere->y_offset;
-												curr_shape_entry.add(Setting::TypeInt) = sphere->color_index;
+										wava_cfg.lookup("control.noise_gate") = wava_args.noise_gate;
+										wava_cfg.lookup("control.brightness") = wava_args.boost;
+										wava_cfg.lookup("control.decay_rate") = wava_args.decay_rate;
+
+										last_pressed_key_message = std::string("Last key pressed: W, write to config");
+
+										Setting& shapes_list = wava_cfg.lookup("shapes_list");
+										shapes_list.remove("list");
+										Setting& list = shapes_list.add("list", Setting::TypeList);
+										for (int i = 0; i < shapes.size(); i++) {
+											Setting& curr_shape_entry = list.add(Setting::TypeList);
+											switch(shapes[i]->shape_type) {
+												case SPHERE_SHAPE:
+													{
+														Sphere* sphere = (Sphere*) shapes[i];
+														curr_shape_entry.add(Setting::TypeInt) = SPHERE_SHAPE;
+														curr_shape_entry.add(Setting::TypeFloat) = sphere->radius;
+														curr_shape_entry.add(Setting::TypeFloat) = sphere->x_offset;
+														curr_shape_entry.add(Setting::TypeFloat) = sphere->y_offset;
+														curr_shape_entry.add(Setting::TypeInt) = sphere->color_index;
+													}
+												break;
+												case DONUT_SHAPE:
+													{
+														Donut* donut = (Donut*) shapes[i];
+														curr_shape_entry.add(Setting::TypeInt) = DONUT_SHAPE;
+														curr_shape_entry.add(Setting::TypeFloat) = donut->radius;
+														curr_shape_entry.add(Setting::TypeFloat) = donut->thickness;
+														curr_shape_entry.add(Setting::TypeFloat) = donut->x_offset;
+														curr_shape_entry.add(Setting::TypeFloat) = donut->y_offset;
+														curr_shape_entry.add(Setting::TypeInt) = donut->color_index;
+													}
+												break;
+												case RECT_PRISM_SHAPE:
+													{
+														RectPrism* rect_prism = (RectPrism*) shapes[i];
+														curr_shape_entry.add(Setting::TypeInt) = RECT_PRISM_SHAPE;
+														curr_shape_entry.add(Setting::TypeFloat) = rect_prism->height;
+														curr_shape_entry.add(Setting::TypeFloat) = rect_prism->width;
+														curr_shape_entry.add(Setting::TypeFloat) = rect_prism->depth;
+														curr_shape_entry.add(Setting::TypeFloat) = rect_prism->x_offset;
+														curr_shape_entry.add(Setting::TypeFloat) = rect_prism->y_offset;
+														curr_shape_entry.add(Setting::TypeInt) = rect_prism->color_index;
+													}
+												break;
 											}
-										break;
-										case DONUT_SHAPE:
-											{
-												Donut* donut = (Donut*) shapes[i];
-												curr_shape_entry.add(Setting::TypeInt) = DONUT_SHAPE;
-												curr_shape_entry.add(Setting::TypeFloat) = donut->radius;
-												curr_shape_entry.add(Setting::TypeFloat) = donut->thickness;
-												curr_shape_entry.add(Setting::TypeFloat) = donut->x_offset;
-												curr_shape_entry.add(Setting::TypeFloat) = donut->y_offset;
-												curr_shape_entry.add(Setting::TypeInt) = donut->color_index;
-											}
-										break;
-										case RECT_PRISM_SHAPE:
-											{
-												RectPrism* rect_prism = (RectPrism*) shapes[i];
-												curr_shape_entry.add(Setting::TypeInt) = RECT_PRISM_SHAPE;
-												curr_shape_entry.add(Setting::TypeFloat) = rect_prism->height;
-												curr_shape_entry.add(Setting::TypeFloat) = rect_prism->width;
-												curr_shape_entry.add(Setting::TypeFloat) = rect_prism->depth;
-												curr_shape_entry.add(Setting::TypeFloat) = rect_prism->x_offset;
-												curr_shape_entry.add(Setting::TypeFloat) = rect_prism->y_offset;
-												curr_shape_entry.add(Setting::TypeInt) = rect_prism->color_index;
-											}
-										break;
+										}
+										shapes_list.lookup("shapes_count") = (int) shapes.size();
+										wava_cfg.writeFile(path.c_str());
 									}
-								}
-								shapes_list.lookup("shapes_count") = (int) shapes.size();
-								wava_cfg.writeFile(path.c_str());
-							}
-						break;
-						case '1': // add donut
-							{
-								Donut* donut = new Donut(0.5, 0.2, 0, 0, 2, wava_plan::freq_bands, 0);
-								shapes.push_back(donut);
-							}
-						break;
-						case '2': // add sphere
-							{
-								Sphere* sphere = new Sphere(1, 0, 0, 2, wava_plan::freq_bands, 0);
-								shapes.push_back(sphere);
-							}
-						break;
-						case '3': // add rect prism
-							{
-								RectPrism* rect_prism = new RectPrism(0.5, 0.5, 0.5, 0, 0, 2, wava_plan::freq_bands, 0);
-								shapes.push_back(rect_prism);
-							}
-						break;
-						case '9':
-							render_args.noise_gate--;
-							last_pressed_key_message = std::string("Last key pressed: 9, decrease noise gate");
-						break;
-						case '0':
-							render_args.noise_gate++;
-							last_pressed_key_message = std::string("Last key pressed: 0, increase noise gate");
-						break;
-						case '8':
-							render_args.boost++;
-							last_pressed_key_message = std::string("Last key pressed: 8, increase boost");
-						break;
-						case '7':
-							render_args.boost--;
-							last_pressed_key_message = std::string("Last key pressed: 7, decrease boost");
-						break;
-						case '6':
-							render_args.decay_rate++;
-							last_pressed_key_message = std::string("Last key pressed: 6, increase decay rate");
-						break;
-						case '5':
-							render_args.decay_rate--;
-							last_pressed_key_message = std::string("Last key pressed: 5, decrease decay rate");
-						break;
-						case 'L': // enter shape lock mode
-							if (shapes.size() > 0) { 
-								highlight_mode = true; 
-								last_pressed_key_message = std::string("Last key pressed: L, shift to shape highlight mode");
-							}
-						break;
-						case 'm':
-							mute = mute ? false : true;
-							last_pressed_key_message = std::string("Last key pressed: m, mute or unmute audio");
-						break;
-						case 'h':
-							hint = hint ? false : true;
-							last_pressed_key_message = std::string("Last key pressed: h, turn on hints");
-						break;
-						case ESC:
-							reload_config = true;
-							quit = true;
-						break;
-						default:
-						break;
-					}
-				}
-				else { // in shape highlighting mode
-					switch(ch) {
-						case ERR: // do nothing
-							draw = true;
-							change_screen_or_plan = false;
-						break;
-						case 'm':
-							mute = mute ? false : true;
-							last_pressed_key_message = std::string("Last key pressed: m, mute or unmute audio");
-							printf("\x1b[2J"); // clear screen
-						break;
-						case 'V':
-							highlight_mode = false;
-							last_pressed_key_message = std::string("Last key pressed: V, change back to normal mode");
-						break;
-						case LEFT_ARROW:
-							shape_pointer--;
-						break;
-						case RIGHT_ARROW:
-							shape_pointer++;
-						break;
-						case UP_ARROW:
-							shapes[shape_pointer]->increase_size();
-							last_pressed_key_message = std::string("Last key pressed: UP, increase shape size");
-						break;
-						case DOWN_ARROW:
-							shapes[shape_pointer]->decrease_size();
-							last_pressed_key_message = std::string("Last key pressed: DOWN, decrease shape size");
-						break;
-						case 'D':
-							if (shapes.size() > 0) {
-								delete shapes[shape_pointer];
-								shapes.erase(shapes.begin()+shape_pointer);
-								last_pressed_key_message = std::string("Last key pressed: D, delete shape");
-							}
-							if (shapes.size() == 0) { // checking if now empty, leave highlight mode if so
-								highlight_mode = false;
-								shape_pointer = -1;
-							}
-						break;
-						case 'z':
-							shapes[shape_pointer]->decrement_palette();
-							last_pressed_key_message = std::string("Last key pressed: z, decrement shape palette");
-						break;
-						case 'x':
-							shapes[shape_pointer]->increment_palette();
-							last_pressed_key_message = std::string("Last key pressed: x, increment shape palette");
-						break;
-						case 'h':
-							hint = hint ? false : true;
-							last_pressed_key_message = std::string("Last key pressed: h, turn on hints");
-						break;
-						case 'i':
-							shapes[shape_pointer]->x_offset-=0.04;
-						break;
-						case 'j':
-							shapes[shape_pointer]->y_offset+=0.04;
-						break;
-						case 'k':
-							shapes[shape_pointer]->x_offset+=0.04;
-						break;
-						case 'l':
-							shapes[shape_pointer]->y_offset-=0.04;
-						break;
-						default:
+								break;
+								case '1': // add donut
+									{
+										Donut* donut = new Donut(0.5, 0.2, 0, 0, 2, wava_plan::freq_bands, 0);
+										shapes.push_back(donut);
+									}
+								break;
+								case '2': // add sphere
+									{
+										Sphere* sphere = new Sphere(1, 0, 0, 2, wava_plan::freq_bands, 0);
+										shapes.push_back(sphere);
+									}
+								break;
+								case '3': // add rect prism
+									{
+										RectPrism* rect_prism = new RectPrism(0.5, 0.5, 0.5, 0, 0, 2, wava_plan::freq_bands, 0);
+										shapes.push_back(rect_prism);
+									}
+								break;
+								case '9':
+									wava_args.noise_gate--;
+									last_pressed_key_message = std::string("Last key pressed: 9, decrease noise gate");
+								break;
+								case '0':
+									wava_args.noise_gate++;
+									last_pressed_key_message = std::string("Last key pressed: 0, increase noise gate");
+								break;
+								case '8':
+									wava_args.boost++;
+									last_pressed_key_message = std::string("Last key pressed: 8, increase boost");
+								break;
+								case '7':
+									wava_args.boost--;
+									last_pressed_key_message = std::string("Last key pressed: 7, decrease boost");
+								break;
+								case '6':
+									wava_args.decay_rate++;
+									last_pressed_key_message = std::string("Last key pressed: 6, increase decay rate");
+								break;
+								case '5':
+									wava_args.decay_rate--;
+									last_pressed_key_message = std::string("Last key pressed: 5, decrease decay rate");
+								break;
+								case 'L': // enter shape lock mode
+									if (shapes.size() > 0) { 
+										highlight_mode = true; 
+										last_pressed_key_message = std::string("Last key pressed: L, shift to shape highlight mode");
+									}
+								break;
+								default:
 
-						break;
-					}
+								break;
+							}
+						}
+						else { // in shape highlighting mode
+							switch(ch) {
+
+								case 'V':
+									highlight_mode = false;
+									last_pressed_key_message = std::string("Last key pressed: V, change back to normal mode");
+								break;
+								case LEFT_ARROW:
+									shape_pointer--;
+								break;
+								case RIGHT_ARROW:
+									shape_pointer++;
+								break;
+								case UP_ARROW:
+									shapes[shape_pointer]->increase_size();
+									last_pressed_key_message = std::string("Last key pressed: UP, increase shape size");
+								break;
+								case DOWN_ARROW:
+									shapes[shape_pointer]->decrease_size();
+									last_pressed_key_message = std::string("Last key pressed: DOWN, decrease shape size");
+								break;
+								case 'D':
+									if (shapes.size() > 0) {
+										delete shapes[shape_pointer];
+										shapes.erase(shapes.begin()+shape_pointer);
+										last_pressed_key_message = std::string("Last key pressed: D, delete shape");
+									}
+									if (shapes.size() == 0) { // checking if now empty, leave highlight mode if so
+										highlight_mode = false;
+										shape_pointer = -1;
+									}
+								break;
+								case 'z':
+									shapes[shape_pointer]->decrement_palette();
+									last_pressed_key_message = std::string("Last key pressed: z, decrement shape palette");
+								break;
+								case 'x':
+									shapes[shape_pointer]->increment_palette();
+									last_pressed_key_message = std::string("Last key pressed: x, increment shape palette");
+								break;
+								case 'i':
+									shapes[shape_pointer]->x_offset-=0.04;
+								break;
+								case 'j':
+									shapes[shape_pointer]->y_offset+=0.04;
+								break;
+								case 'k':
+									shapes[shape_pointer]->x_offset+=0.04;
+								break;
+								case 'l':
+									shapes[shape_pointer]->y_offset-=0.04;
+								break;
+								default:
+
+								break;
+							}
+						}
+					break;
 				}
+
 				usleep(1000); // NEED this or some kind of delay to get results that make sense apparently
 			}
 		}

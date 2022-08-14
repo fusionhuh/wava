@@ -29,13 +29,13 @@
 #define TREBLE_WEIGHT_FUNCTION 2
 #define WAVA_WEIGHT_FUNCTION_COUNT 3
 
-// geometry/matrix portion
 #ifndef PI
 #define PI 3.14159265359
 #endif
 
 using namespace libconfig;
 
+// MATH PORTION
 struct vec3
 {
     float x, y, z;
@@ -73,8 +73,9 @@ vec3 operator*(vec3 vec, matrix3 mat);
 void normalize_vector(std::vector<double>& vec);
 
 double operator*(const std::vector<double>& vec1, const std::vector<double>& vec2);
+// MATH PORTION END
 
-// shapes/colors portion
+// COLORS PORTION
 struct Color {
 	uint8_t r; uint8_t g; uint8_t b;
 
@@ -102,21 +103,23 @@ struct ColorPalette {
 
 	std::vector<Color> colors;
 };
+// COLORS PORTION END
 
+// SHAPES PORTION
 struct Shape {
 	ColorPalette palette;
-	Color calculate_corresponding_color(float normalized_val /*decimal number ranging from 0 to 1*/);
 
 	virtual void increment_palette();
 	virtual void decrement_palette();
 
-	const int shape_type;
-
 	const float base_luminance;
-	const float velocity; // rate of translational movement
 	float x_offset;
 	float y_offset;
 
+	int color_index;
+
+	const int shape_type;
+	
 	bool highlight;
 
 	std::vector<double> luminance_weighting_function;
@@ -124,23 +127,20 @@ struct Shape {
 	virtual void decrease_size();
 	virtual void increase_size();
 
-	Shape(float x_offset, float y_offset, float base_luminance, int freq_bands, int color_index, int shape_type);
+	Color calculate_corresponding_color(float normalized_val /*decimal number ranging from 0 to 1*/);
 
-	int color_index;
+	Shape(float x_offset, float y_offset, float base_luminance, int freq_bands, int color_index, int shape_type);
 };
 
 struct TriPrism : public Shape {
 	float side, height;
 	std::vector<float> side_weighting_function;
 	std::vector<float> height_weighting_function;
-
-
 };
 
 struct Sphere : public Shape {
 	float radius;
 	std::vector<double> radius_weighting_function;
-
 
 	void decrease_size();
 	void increase_size();
@@ -154,7 +154,6 @@ struct Donut : public Shape {
 
 	void decrease_size();
 	void increase_size();
-
 
 	Donut(float radius, float thickness, float x_offset, float y_offset, float base_luminance, int freq_bands, int color_index);
 };
@@ -175,42 +174,43 @@ struct Triangle : public Shape {
 
 	void decrease_size();
 	void increase_size();	
-
 };
+// SHAPES PORTION END
 
+// RENDERING PORTION
 struct wava_screen {
 	const int x, y;
+
+	const float theta_spacing, phi_spacing, prism_spacing;
+
+	const float light_smoothness;	
+
+	const int bg_palette_index;
+	
 	std::mutex mtx; 
 
 	float K1, K2, R1, R2;
 
 	const std::string background_print_str;
 	const std::string shape_print_str;
-
-	const int bg_palette_index;
-
-	const float theta_spacing, phi_spacing, prism_spacing;
 	
 	ColorPalette bg_palette;
 
-	public:
-		static vec3 light;
-		const float light_smoothness;
+	static vec3 light;
 
-		wava_screen(int x, int y, float theta, float phi, float rect, float smoothness, int palette_index);
+	std::vector<double> zbuffer;
+	std::vector<ColorTag> output;
 
-		std::vector<double> zbuffer;
-		std::vector<ColorTag> output;
+	int get_index(int x_coord, int y_coord);
 
-		int get_index(int x_coord, int y_coord);
+	const char* get_shape_print_str();
+	const char* get_background_print_str();
 
-		const char* get_shape_print_str();
-		const char* get_background_print_str();
+	std::tuple<int, int, float> calculate_proj_coord(vec3 pos);
 
-		std::tuple<int, int, float> calculate_proj_coord(vec3 pos);
+	void write_to_z_buffer_and_output(const float* zbuffer, const ColorTag* output); // data length is assumed to be correct
 
-		void write_to_z_buffer_and_output(const float* zbuffer, const ColorTag* output); // data length is assumed to be correct
-
+	wava_screen(int x, int y, float theta, float phi, float rect, float smoothness, int palette_index);
 };
 
 void draw_donut (Donut donut, wava_screen &screen, std::vector<double> wava_out, float A, float B);
@@ -219,5 +219,6 @@ void draw_sphere (Sphere sphere, wava_screen &screen, std::vector<double> wava_o
 
 void draw_rect_prism (RectPrism rect_prism, wava_screen &screen, std::vector<double> wava_out, float A, float B);
 
-std::vector<Shape*> generate_shapes(Setting& shape_list, int freq_bands, int color_index);
+std::vector<Shape*> generate_shapes(Setting& shape_list, int freq_bands);
+// RENDERING PORTION END
 

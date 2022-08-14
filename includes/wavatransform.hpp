@@ -11,18 +11,20 @@
 
 
 struct wava_plan {
-	int fft_buffer_size;
-	int audio_channels;
-	static int freq_bands;
-
 	int rate;
-	static double freq_bin_size;
+
+	int audio_channels;
 
 	double noise_gate;
 	double boost;
 	double decay_rate;
 
-	static double calibration;
+	static double freq_bin_size;
+
+	int fft_buffer_size;
+	static int freq_bands;
+
+	static double calibration; // used to adjust frequencies in case they are off for some reason
 
 	fftw_plan plan_left;
 	fftw_plan plan_right;
@@ -60,8 +62,6 @@ struct wava_plan {
 
 	~wava_plan();
 };
-
-struct wava_plan wava_init(unsigned int rate, int channels, double noise_reduction, int low_cut_off, int high_cut_off);
 
 std::vector<double> wava_execute(double* wava_in, int new_samples, struct wava_plan &plan);
 
