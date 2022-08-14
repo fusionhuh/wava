@@ -2,6 +2,7 @@
 #include <vector>
 #include <mutex>
 #include <string>
+#include <libconfig.h++>
 
 // color/shapes portion
 #define PHI_SPACING 0.05
@@ -32,6 +33,8 @@
 #ifndef PI
 #define PI 3.14159265359
 #endif
+
+using namespace libconfig;
 
 struct vec3
 {
@@ -109,7 +112,6 @@ struct Shape {
 
 	const int shape_type;
 
-
 	const float base_luminance;
 	const float velocity; // rate of translational movement
 	float x_offset;
@@ -124,7 +126,7 @@ struct Shape {
 
 	Shape(float x_offset, float y_offset, float base_luminance, int freq_bands, int color_index, int shape_type);
 
-	private : int color_index;
+	int color_index;
 };
 
 struct TriPrism : public Shape {
@@ -217,5 +219,5 @@ void draw_sphere (Sphere sphere, wava_screen &screen, std::vector<double> wava_o
 
 void draw_rect_prism (RectPrism rect_prism, wava_screen &screen, std::vector<double> wava_out, float A, float B);
 
-std::vector<Shape*> generate_shapes(int donut_count, int sphere_count, int rect_prism_count, float variance, int freq_bands, int color_index);
+std::vector<Shape*> generate_shapes(Setting& shape_list, int freq_bands, int color_index);
 

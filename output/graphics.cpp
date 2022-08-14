@@ -138,19 +138,31 @@ Shape::Shape(float x_offset, float y_offset, float base_luminance, int freq_band
 Donut::Donut(float radius, float thickness, float x_offset, float y_offset, float base_luminance, int freq_bands, int color_index) :
     radius(radius), thickness(thickness), Shape(x_offset, y_offset, base_luminance, freq_bands, color_index, DONUT_SHAPE)
 {
-    
+    radius_weighting_function = std::vector<double>(freq_bands);
+    radius_weighting_function[0] = 1;
+    thickness_weighting_function = std::vector<double>(freq_bands);
+    thickness_weighting_function[0] = 1;
+    luminance_weighting_function = std::vector<double>(freq_bands);
+    luminance_weighting_function[0] = 1;
+
 }
 
 Sphere::Sphere(float radius, float x_offset, float y_offset, float base_luminance, int freq_bands, int color_index) :
     radius(radius), Shape(x_offset, y_offset, base_luminance, freq_bands, color_index, SPHERE_SHAPE)
 {
-    highlight = false;
+    radius_weighting_function = std::vector<double>(freq_bands);
+    radius_weighting_function[0] = 0.5;
+    luminance_weighting_function = std::vector<double>(freq_bands);
+    luminance_weighting_function[0] = 1;
 }
 
 RectPrism::RectPrism(float height, float width, float depth, float x_offset, float y_offset, float base_luminance, int freq_bands, int color_index) :
     height(height), width(width), depth(depth), Shape(x_offset, y_offset, base_luminance, freq_bands, color_index, RECT_PRISM_SHAPE)
 {
-
+    volume_weighting_function = std::vector<double>(freq_bands);
+    volume_weighting_function[0] = 1;
+    luminance_weighting_function = std::vector<double>(freq_bands);
+    luminance_weighting_function[0] = 1;
 }
 
 void normalize_vector(std::vector<double>& vec) {
@@ -169,40 +181,38 @@ double operator*(const std::vector<double>& vec1, const std::vector<double>& vec
 	return dot;
 }
 
-std::vector<Shape*> generate_shapes(int donut_count, int sphere_count, int rect_prism_count, float variance, int freq_bands, int color_index) {
+std::vector<Shape*> generate_shapes(Setting& shape_list, int freq_bands, int color_index) {
     std::vector<Shape*> shapes;
 
-    for (int i = 0; i < donut_count; i++) {
-        Donut* donut = new Donut(0.5, 0.2, 0, 0, 2, freq_bands, color_index);
+    int shapes_count = shape_list.lookup("shapes_count");
+    Setting& list = shape_list.lookup("list");
 
-        donut->radius_weighting_function = std::vector<double>(freq_bands);
-        donut->radius_weighting_function[0] = 1;
-        donut->thickness_weighting_function = std::vector<double>(freq_bands);
-        donut->thickness_weighting_function[0] = 1;
-        donut->luminance_weighting_function = std::vector<double>(freq_bands);
-        donut->luminance_weighting_function[0] = 1;
+    for (int i = 0; i < shapes_count; i++) {
+        switch((int) list[i][0]) {
+            case DONUT_SHAPE:
+                {
+                    Donut* donut = new Donut(list[i][1], list[i][2], list[i][3], list[i][4], 1, freq_bands, list[i][5]);
+                    shapes.push_back(donut);
+                }
+            break;
+            case SPHERE_SHAPE:
+                {
+                    Sphere* sphere = new Sphere(list[i][1], list[i][2], list[i][3], 1, freq_bands, list[i][4]);
+                    shapes.push_back(sphere);
+                }
+            break;
+            case RECT_PRISM_SHAPE:
+                {
+                    RectPrism* rect_prism = new RectPrism(list[i][1], list[i][2], list[i][3], list[i][4], list[i][5], 1, freq_bands, list[i][6]);
+                    shapes.push_back(rect_prism);
+                }
+            break;
+            default:
+                std::cerr << "Invalid shape type retrieved from config." << std::endl;
+                exit(-1);
+            break;
+        }
 
-        shapes.push_back(donut);
-    }
-    for (int i = 0; i < sphere_count; i++) {
-        Sphere* sphere = new Sphere(0.5, 0, 0, 2, freq_bands, color_index);
-
-        sphere->radius_weighting_function = std::vector<double>(freq_bands);
-        sphere->radius_weighting_function[0] = 0.5;
-        sphere->luminance_weighting_function = std::vector<double>(freq_bands);
-        sphere->luminance_weighting_function[0] = 1;
-
-        shapes.push_back(sphere);
-    }
-    for (int i = 0; i < rect_prism_count; i++) {
-        RectPrism* rect_prism = new RectPrism(1, 1, 1, 0, 0, 2, freq_bands, color_index);
-
-        rect_prism->volume_weighting_function = std::vector<double>(freq_bands);
-        rect_prism->volume_weighting_function[0] = 1;
-        rect_prism->luminance_weighting_function = std::vector<double>(freq_bands);
-        rect_prism->luminance_weighting_function[0] = 1;
-
-        shapes.push_back(rect_prism);
     }
 
     return shapes;

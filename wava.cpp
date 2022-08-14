@@ -72,8 +72,8 @@ int main(int argc, char** argv) {
 	Config wava_cfg;
 	//wava_cfg.setOptions(Config::OptionAllowScientificNotation); // only works in 1.7
 
+	std::string path = std::string(getenv("HOME")) + std::string("/.config/wava/wava.cfg");
 	try {
-		std::string path = std::string(getenv("HOME")) + std::string("/.config/wava/wava.cfg");
 		wava_cfg.readFile(path.c_str());
 	}
 	catch(const FileIOException &fioex) {
@@ -85,12 +85,46 @@ int main(int argc, char** argv) {
 		exit(-1);
 	}
 
+	try {
+		bool read_warning = wava_cfg.lookup("read_warning");
+		Setting& setting = wava_cfg.lookup("read_warning");
+		if (!read_warning) {
+			std::cout << "WARNING: wava can produce flashing lights that may not be suitable for individuals with epilepsy."
+			" Please use this software at your own risk." << std::endl << "Do you understand? Y/n (will not appear again) " << std::endl;
+			char n;
+			std::cin >> n;
+			if (n == 'Y' || n == 'y') {
+				setting = true;
+				wava_cfg.writeFile(path.c_str());
+			}
+			else if (n == 'N' || n == 'n') {
+				std::cout << "Thank you, wava is now exiting." << std::endl;
+				exit(0);
+			}
+		}
+	}
+	catch(const SettingNotFoundException& nfex) {
+		std::cerr << "Could not find 'read_warning' setting." << std::endl;
+		exit(-1);
+	}
+	catch(const SettingTypeException& stex) {
+		std::cerr << "Could not find 'read_warning' setting." << std::endl;
+		exit(-1);
+	}
+	catch(const FileIOException &fioex) {
+		std::cerr << "Error occurred while writing to config file, it may be missing. Try reinstalling wava." << std::endl;
+		exit(-1);
+	}
+
 	set_raw_mode(true); // necessary for reading keyboard input
 
 	// main loop	
 	bool quit = false;
 	bool mute = false;
 	bool hint = true;
+
+	bool highlight_mode = false;
+	int shape_pointer = -1;	
 
 	std::string last_pressed_key_message("");
 
@@ -99,27 +133,28 @@ int main(int argc, char** argv) {
 		int screen_y = 30;
 
 		// Load config values
+		std::vector<Shape*> shapes;
 		if (!render_args.ignore_config) {
 			try {
+				wava_cfg.readFile(path.c_str());
+
 				render_args.phi_spacing = wava_cfg.lookup("rendering.phi_spacing");
 				render_args.theta_spacing = wava_cfg.lookup("rendering.theta_spacing");
 				render_args.prism_spacing = wava_cfg.lookup("rendering.prism_spacing");
 				render_args.light_smoothness = wava_cfg.lookup("rendering.light_smoothness");
 				render_args.bg_palette = wava_cfg.lookup("rendering.bg_palette");
-
-				render_args.donut_count = wava_cfg.lookup("shapes.donut_count");
-				render_args.sphere_count = wava_cfg.lookup("shapes.sphere_count");
-				render_args.rect_prism_count = wava_cfg.lookup("shapes.rect_prism_count");
-				render_args.shape_palette = wava_cfg.lookup("shapes.shape_palette");
+		
+				shapes = generate_shapes(wava_cfg.lookup("shapes_list"), wava_plan::freq_bands, render_args.shape_palette);
 			}
 			catch(const SettingNotFoundException &nfex) {
 				std::cerr << "Error occurred while doing lookup for setting." << std::endl;
 				exit(-1);
 			}
 		}
-		render_args.ignore_config = false;
-
-		std::vector<Shape*> shapes = generate_shapes(render_args.donut_count, render_args.sphere_count, render_args.rect_prism_count, 0, wava_plan::freq_bands, render_args.shape_palette);
+		else {
+			render_args.ignore_config = true;
+			shapes = generate_shapes(wava_cfg.lookup("shapes_list"), wava_plan::freq_bands, render_args.shape_palette);
+		}
 
 		struct audio_data audio(2, 44100);
 		// here is where we would have a switch for audio input
@@ -134,9 +169,6 @@ int main(int argc, char** argv) {
 		//break
 
 		bool reload_config = false;
-
-		bool highlight_mode = false;
-		int shape_pointer = -1;	
 
 		while (!reload_config) { // while (!reloadConf) 
 			printf("\x1b[2J"); // clear screen
@@ -174,7 +206,8 @@ int main(int argc, char** argv) {
 					}
 					else { shapes[i]->highlight = false; }// need to do this to "unhighlight" shape pointed to previously
 				}
-			} else {
+			} 
+			else {
 				for (int i = 0; i < shapes.size(); i++) {
 					shapes[i]->highlight = false;
 				}
@@ -272,27 +305,82 @@ int main(int argc, char** argv) {
 							render_args.bg_palette--;
 							last_pressed_key_message = std::string("Last key pressed: x, decrement background color palette");
 						break;
-						case 'S':
+						case 'R':
 							reload_config = true;
-							last_pressed_key_message = std::string("Last key pressed: S, reload config");
+							last_pressed_key_message = std::string("Last key pressed: R, reload config");
 						break;
 						case 'W':
-							// write to config
+							{
+								// write to config
+								wava_cfg.lookup("rendering.bg_palette") = render_args.bg_palette;
+								wava_cfg.lookup("rendering.light_smoothness") = render_args.light_smoothness;
+								wava_cfg.lookup("rendering.phi_spacing") = render_args.phi_spacing;
+								wava_cfg.lookup("rendering.theta_spacing") = render_args.theta_spacing;
+								wava_cfg.lookup("rendering.prism_spacing") = render_args.prism_spacing;
+								last_pressed_key_message = std::string("Last key pressed: W, write to config");
+
+								Setting& shapes_list = wava_cfg.lookup("shapes_list");
+								shapes_list.remove("list");
+								Setting& list = shapes_list.add("list", Setting::TypeList);
+								for (int i = 0; i < shapes.size(); i++) {
+									Setting& curr_shape_entry = list.add(Setting::TypeList);
+									switch(shapes[i]->shape_type) {
+										case SPHERE_SHAPE:
+											{
+												Sphere* sphere = (Sphere*) shapes[i];
+												curr_shape_entry.add(Setting::TypeInt) = SPHERE_SHAPE;
+												curr_shape_entry.add(Setting::TypeFloat) = sphere->radius;
+												curr_shape_entry.add(Setting::TypeFloat) = sphere->x_offset;
+												curr_shape_entry.add(Setting::TypeFloat) = sphere->y_offset;
+												curr_shape_entry.add(Setting::TypeInt) = sphere->color_index;
+											}
+										break;
+										case DONUT_SHAPE:
+											{
+												Donut* donut = (Donut*) shapes[i];
+												curr_shape_entry.add(Setting::TypeInt) = DONUT_SHAPE;
+												curr_shape_entry.add(Setting::TypeFloat) = donut->radius;
+												curr_shape_entry.add(Setting::TypeFloat) = donut->thickness;
+												curr_shape_entry.add(Setting::TypeFloat) = donut->x_offset;
+												curr_shape_entry.add(Setting::TypeFloat) = donut->y_offset;
+												curr_shape_entry.add(Setting::TypeInt) = donut->color_index;
+											}
+										break;
+										case RECT_PRISM_SHAPE:
+											{
+												RectPrism* rect_prism = (RectPrism*) shapes[i];
+												curr_shape_entry.add(Setting::TypeInt) = RECT_PRISM_SHAPE;
+												curr_shape_entry.add(Setting::TypeFloat) = rect_prism->height;
+												curr_shape_entry.add(Setting::TypeFloat) = rect_prism->width;
+												curr_shape_entry.add(Setting::TypeFloat) = rect_prism->depth;
+												curr_shape_entry.add(Setting::TypeFloat) = rect_prism->x_offset;
+												curr_shape_entry.add(Setting::TypeFloat) = rect_prism->y_offset;
+												curr_shape_entry.add(Setting::TypeInt) = rect_prism->color_index;
+											}
+										break;
+									}
+								}
+								shapes_list.lookup("shapes_count") = (int) shapes.size();
+								wava_cfg.writeFile(path.c_str());
+							}
 						break;
 						case '1': // add donut
-							render_args.donut_count++;
-							reload_config = true;
-							render_args.ignore_config = true;
+							{
+								Donut* donut = new Donut(0.5, 0.2, 0, 0, 2, wava_plan::freq_bands, 0);
+								shapes.push_back(donut);
+							}
 						break;
 						case '2': // add sphere
-							render_args.sphere_count++;
-							reload_config = true;
-							render_args.ignore_config = true;
+							{
+								Sphere* sphere = new Sphere(1, 0, 0, 2, wava_plan::freq_bands, 0);
+								shapes.push_back(sphere);
+							}
 						break;
 						case '3': // add rect prism
-							render_args.rect_prism_count++;
-							reload_config = true;
-							render_args.ignore_config = true;
+							{
+								RectPrism* rect_prism = new RectPrism(0.5, 0.5, 0.5, 0, 0, 2, wava_plan::freq_bands, 0);
+								shapes.push_back(rect_prism);
+							}
 						break;
 						case '9':
 							render_args.noise_gate--;
@@ -326,7 +414,6 @@ int main(int argc, char** argv) {
 						break;
 						case 'm':
 							mute = mute ? false : true;
-							change_screen_or_plan = false;
 							last_pressed_key_message = std::string("Last key pressed: m, mute or unmute audio");
 						break;
 						case 'h':
@@ -372,17 +459,6 @@ int main(int argc, char** argv) {
 						break;
 						case 'D':
 							if (shapes.size() > 0) {
-								switch(shapes[shape_pointer]->shape_type) {
-									case DONUT_SHAPE:
-										render_args.donut_count--;
-									break;
-									case SPHERE_SHAPE:
-										render_args.sphere_count--;
-									break;
-									case RECT_PRISM_SHAPE:
-										render_args.rect_prism_count--;
-									break;
-								}
 								delete shapes[shape_pointer];
 								shapes.erase(shapes.begin()+shape_pointer);
 								last_pressed_key_message = std::string("Last key pressed: D, delete shape");
