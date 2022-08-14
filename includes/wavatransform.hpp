@@ -18,7 +18,9 @@ struct wava_plan {
 	int rate;
 	static double freq_bin_size;
 
-	double noise_reduction;
+	double noise_gate;
+	double boost;
+	double decay_rate;
 
 	static double calibration;
 
@@ -54,7 +56,7 @@ struct wava_plan {
 	int screen_x;
 	int screen_y;
 
-	wava_plan(unsigned int rate, int channels, double noise_reduction, int low_cut_off, int high_cut_off);
+	wava_plan(unsigned int rate, int channels, double noise_gate, double boost, double decay_rate);
 
 	~wava_plan();
 };

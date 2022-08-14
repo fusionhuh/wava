@@ -81,8 +81,6 @@ struct Color {
 	Color operator+(const Color& color2);
 };
 
-
-
 Color operator*(double scalar, const Color& color);
 
 bool operator==(const Color& color1, const Color& color2);
@@ -106,23 +104,27 @@ struct Shape {
 	ColorPalette palette;
 	Color calculate_corresponding_color(float normalized_val /*decimal number ranging from 0 to 1*/);
 
+	virtual void increment_palette();
+	virtual void decrement_palette();
+
 	const int shape_type;
+
 
 	const float base_luminance;
 	const float velocity; // rate of translational movement
-	const float x_offset;
-	const float y_offset;
+	float x_offset;
+	float y_offset;
 
 	bool highlight;
 
 	std::vector<double> luminance_weighting_function;
 
-	virtual int get_shape_type();
-
 	virtual void decrease_size();
 	virtual void increase_size();
 
 	Shape(float x_offset, float y_offset, float base_luminance, int freq_bands, int color_index, int shape_type);
+
+	private : int color_index;
 };
 
 struct TriPrism : public Shape {
@@ -130,7 +132,6 @@ struct TriPrism : public Shape {
 	std::vector<float> side_weighting_function;
 	std::vector<float> height_weighting_function;
 
-	int get_shape_type();
 
 };
 
@@ -138,7 +139,6 @@ struct Sphere : public Shape {
 	float radius;
 	std::vector<double> radius_weighting_function;
 
-	int get_shape_type();
 
 	void decrease_size();
 	void increase_size();
@@ -153,7 +153,6 @@ struct Donut : public Shape {
 	void decrease_size();
 	void increase_size();
 
-	int get_shape_type();
 
 	Donut(float radius, float thickness, float x_offset, float y_offset, float base_luminance, int freq_bands, int color_index);
 };
@@ -165,7 +164,6 @@ struct RectPrism : public Shape {
 	void decrease_size();
 	void increase_size();
 
-	int get_shape_type();
 
 	RectPrism(float height, float width, float depth, float x_offset, float y_offset, float base_luminance, int freq_bands, int color_index);
 };
@@ -176,7 +174,6 @@ struct Triangle : public Shape {
 	void decrease_size();
 	void increase_size();	
 
-	int get_shape_type();
 };
 
 struct wava_screen {

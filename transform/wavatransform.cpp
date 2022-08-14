@@ -22,8 +22,9 @@ double wava_plan::calibration = 0;
 
 int wava_plan::freq_bands = 15;
 
-wava_plan::wava_plan(unsigned int rate, int channels, double noise_reduction, int low_cut_off, int high_cut_off) :
-	rate(rate), audio_channels(channels), noise_reduction(noise_reduction), input_buffer_size(FFT_IN_SIZE * channels)
+wava_plan::wava_plan(unsigned int rate, int channels, double noise_gate, double boost, double decay_rate) :
+	rate(rate), audio_channels(channels), input_buffer_size(FFT_IN_SIZE * channels), noise_gate(noise_gate),
+	boost(boost), decay_rate(decay_rate)
 {
 	// Hann Window multipliers
 	for (int i = 0; i < 8192; i++) {
@@ -180,10 +181,10 @@ std::vector<double> wava_execute(double* wava_in, int new_samples, wava_plan &pl
 	std::vector<double> hps_output = calculate_hps(plan.l_output_data_magnitude, 3);
 
 	for (int i = 0; i < hps_output.size(); i++) {
-		if (hps_output[i] > 1e10) {
+		if (hps_output[i] > plan.noise_gate * 1e7 * pow(1.1, plan.noise_gate)) {
 			int note = adjust_freq_to_note( ((double) ((44100/2)/(hps_output.size()))) * i );
 			if (note != -1) {
-				if (hps_output[i] > wava_out[note] * 1.0e12) wava_out[note] = hps_output[i] * 1/1.0e12;
+				if (hps_output[i] > wava_out[note] * plan.boost * 1.0e10) wava_out[note] = hps_output[i] * plan.boost * 1/1.0e10;
 			}
 		}
 	}
@@ -196,12 +197,11 @@ std::vector<double> wava_execute(double* wava_in, int new_samples, wava_plan &pl
 	magnitude = (magnitude >= 1.0l) ? 1/magnitude : 1.0l;
 
 	for (int i = 3; i < wava_out.size(); i++) {
-		wava_out[i] *= magnitude;
+		wava_out[i] *= magnitude * (plan.boost/50);
 	}
 
-
 	for (int i = 3; i < wava_out.size(); i++) {
-		if (wava_out[i] < plan.prev_wava_out[i] && (plan.prev_wava_out[i] - wava_out[i]) > 0.01) wava_out[i] = plan.prev_wava_out[i] - 0.01;
+		if (wava_out[i] < plan.prev_wava_out[i] && (plan.prev_wava_out[i] - wava_out[i]) > 0.001 * plan.decay_rate) { wava_out[i] = plan.prev_wava_out[i] - 0.001*plan.decay_rate; }
 		plan.prev_wava_out[i] = wava_out[i];
 	}
 

@@ -7,7 +7,7 @@ void render_cli_frame (std::vector<Shape*> shapes, wava_screen &screen, std::vec
     std::vector<std::thread> threads; 
     std::vector<double> weighting;
     for (int i = 0; i < shapes.size(); i++) {
-        switch(shapes[i]->get_shape_type()) {
+        switch(shapes[i]->shape_type) {
             case DONUT_SHAPE:
                 {
                 Donut* donut = (Donut*) shapes[i];

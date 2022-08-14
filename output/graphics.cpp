@@ -37,48 +37,31 @@ ColorTag::ColorTag(const Color& color, float lum) : luminance(lum) { this->color
 Color Shape::calculate_corresponding_color(float normalized_val) {
     int palette_size = palette.colors.size();
 
-    if (highlight) {
-        unsigned char val = rand() % 256;
-        return Color(val, val, val);
-    }
-
     if (palette.symmetric) {
         int palette_index = normalized_val * (palette_size + ((int) ((palette_size/2) + 1)));
         if (palette_index == (palette_size + ((int) (palette_size/2) + 1))) palette_index--;
         if (palette_index >= palette_size) palette_index -= palette_size;
-
-        return palette.colors[palette_index];
+        if (highlight) {
+            unsigned char val = (rand() % 5) + 30;
+            return palette.colors[palette_index] + Color(val, val, val);
+        }
+        else {
+            return palette.colors[palette_index];
+        }
     }
     else {
         int palette_index = normalized_val * (palette_size);
         if (palette_index == palette_size) palette_index--;
 
-        return palette.colors[palette_index];
+        if (highlight) {
+            unsigned char val = (rand() % 5) + 30;
+            Color col = palette.colors[palette_index];
+            return Color(col.r + val, col.g + val, col.b + val);
+        }
+        else {
+            return palette.colors[palette_index];
+        }
     }
-}
-
-int Shape::get_shape_type() { return 0; }
-int TriPrism::get_shape_type() { return TRI_PRISM_SHAPE; }
-int Sphere::get_shape_type() { return SPHERE_SHAPE; }
-int Donut::get_shape_type() { return DONUT_SHAPE; }
-int RectPrism::get_shape_type() { return RECT_PRISM_SHAPE; }
-int Triangle::get_shape_type() { return TRIANGLE_SHAPE; }
-
-void Shape::increase_size() {}
-void Donut::increase_size() { radius+=0.05; thickness+=0.02; }
-void Sphere::increase_size() { radius+=0.05; }
-void RectPrism::increase_size() { width+=0.05; depth+=0.05; height+=0.05; }
-
-void Shape::decrease_size() {}
-void Donut::decrease_size() {
-    if (radius >= 0.1) radius-=0.05;
-    if (thickness >= 0.04) thickness-=0.02;
-}
-void Sphere::decrease_size() {
-    if (radius >= 0.1) radius-=0.05;
-}
-void RectPrism::decrease_size() {
-    if (width >= 0.1) { width-=0.05; depth-=0.05; height-=0.05; }
 }
 
 ColorPalette generate_palette(int index) {
@@ -88,7 +71,7 @@ ColorPalette generate_palette(int index) {
     switch (index) {
         case TRANS_FLAG_PALETTE:
         {
-            std::vector<Color> colors = { Color(0xFF, 0xFF, 0xFF), Color(0xFF, 0xFF, 0xFF), Color(0xFF, 0xFF, 0xFF) };
+            std::vector<Color> colors = { Color(0x5B, 0xCE, 0xFA), Color(0xF5, 0xA9, 0xB8), Color(0xFF, 0xFF, 0xFF) };
             palette = ColorPalette { std::string("trans"), false, colors };
         }
         break;
@@ -116,8 +99,37 @@ ColorPalette generate_palette(int index) {
     return palette;
 }
 
+void Shape::increment_palette() {
+    color_index++;
+    if (color_index == WAVA_PALETTE_COUNT) color_index = 0;
+    palette = generate_palette(color_index);
+}
+
+void Shape::decrement_palette() {
+    color_index--;
+    if (color_index < 0) color_index = WAVA_PALETTE_COUNT - 1;
+    palette = generate_palette(color_index);
+}
+
+void Shape::increase_size() {}
+void Donut::increase_size() { radius+=0.05; thickness+=0.02; }
+void Sphere::increase_size() { radius+=0.05; }
+void RectPrism::increase_size() { width+=0.05; depth+=0.05; height+=0.05; }
+
+void Shape::decrease_size() {}
+void Donut::decrease_size() {
+    if (radius >= 0.1) radius-=0.05;
+    if (thickness >= 0.04) thickness-=0.02;
+}
+void Sphere::decrease_size() {
+    if (radius >= 0.1) radius-=0.05;
+}
+void RectPrism::decrease_size() {
+    if (width >= 0.1) { width-=0.05; depth-=0.05; height-=0.05; }
+}
+
 Shape::Shape(float x_offset, float y_offset, float base_luminance, int freq_bands, int color_index, int shape_type) :
-    x_offset(x_offset), y_offset(y_offset), base_luminance(base_luminance), velocity(0), highlight(false), shape_type(shape_type)
+    x_offset(x_offset), y_offset(y_offset), base_luminance(base_luminance), velocity(0), highlight(false), color_index(color_index), shape_type(shape_type)
 {
     luminance_weighting_function = std::vector<double>(freq_bands);
     palette = generate_palette(color_index);
@@ -132,7 +144,7 @@ Donut::Donut(float radius, float thickness, float x_offset, float y_offset, floa
 Sphere::Sphere(float radius, float x_offset, float y_offset, float base_luminance, int freq_bands, int color_index) :
     radius(radius), Shape(x_offset, y_offset, base_luminance, freq_bands, color_index, SPHERE_SHAPE)
 {
-
+    highlight = false;
 }
 
 RectPrism::RectPrism(float height, float width, float depth, float x_offset, float y_offset, float base_luminance, int freq_bands, int color_index) :
@@ -174,8 +186,6 @@ std::vector<Shape*> generate_shapes(int donut_count, int sphere_count, int rect_
     }
     for (int i = 0; i < sphere_count; i++) {
         Sphere* sphere = new Sphere(0.5, 0, 0, 2, freq_bands, color_index);
-
-        sphere->highlight = false;
 
         sphere->radius_weighting_function = std::vector<double>(freq_bands);
         sphere->radius_weighting_function[0] = 0.5;

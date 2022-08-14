@@ -59,6 +59,9 @@ struct RenderingArgs : MainArguments<RenderingArgs> {
 
 	bool ignore_config = option("ignore_config", 'i');
 
+	double noise_gate = option("noise_gate", 'X') = 50;
+	double boost = option("boost", 'Y') = 50;
+	double decay_rate = option("decay_rate", 'Z') = 50;
 };
 
 int main(int argc, char** argv) {
@@ -87,6 +90,9 @@ int main(int argc, char** argv) {
 	// main loop	
 	bool quit = false;
 	bool mute = false;
+	bool hint = true;
+
+	std::string last_pressed_key_message("");
 
 	while (!quit) {
 		int screen_x = 30; 
@@ -130,7 +136,7 @@ int main(int argc, char** argv) {
 		bool reload_config = false;
 
 		bool highlight_mode = false;
-		int shape_pointer = -10;	
+		int shape_pointer = -1;	
 
 		while (!reload_config) { // while (!reloadConf) 
 			printf("\x1b[2J"); // clear screen
@@ -145,25 +151,36 @@ int main(int argc, char** argv) {
 			if (render_args.light_smoothness > 100) render_args.light_smoothness = 100;
 			if (render_args.light_smoothness < 2) render_args.light_smoothness = 4;
 
-			if (render_args.bg_palette < 0) render_args.bg_palette = 0;
-			if (render_args.bg_palette == WAVA_PALETTE_COUNT) render_args.bg_palette--;
+			if (render_args.bg_palette < 0) render_args.bg_palette = WAVA_PALETTE_COUNT - 1;
+			if (render_args.bg_palette == WAVA_PALETTE_COUNT) render_args.bg_palette = 0;
 
 			if (render_args.shape_palette < 0) render_args.shape_palette = 0;
 			if (render_args.bg_palette == WAVA_PALETTE_COUNT) render_args.bg_palette--;
 
+			if (render_args.noise_gate < 0) render_args.noise_gate = 0;
+			if (render_args.noise_gate > 100) render_args.noise_gate = 100;
+
 			if (highlight_mode) {
-				if (shape_pointer >= shapes.size()) { shape_pointer = 0; } // loop around
-				if (shape_pointer < 0) { shape_pointer = shapes.size() - 1; }
+				if (shape_pointer >= shapes.size()) { 
+					shape_pointer = 0; 
+				}
+				else if (shape_pointer < 0) { 
+					shape_pointer = shapes.size() - 1; 
+				}
+
 				for (int i = 0; i < shapes.size(); i++) {
 					if (i == shape_pointer) {
 						shapes[i]->highlight = true;
 					}
 					else { shapes[i]->highlight = false; }// need to do this to "unhighlight" shape pointed to previously
 				}
+			} else {
+				for (int i = 0; i < shapes.size(); i++) {
+					shapes[i]->highlight = false;
+				}
 			}
 
-
-			struct wava_plan plan(44100, 2, 0.77, 100, 10000);
+			struct wava_plan plan(44100, 2, render_args.noise_gate, render_args.boost, render_args.decay_rate);
 
 			struct wava_screen screen(screen_y, screen_x, render_args.theta_spacing, render_args.phi_spacing, render_args.prism_spacing,
 				render_args.light_smoothness, render_args.bg_palette);
@@ -171,8 +188,6 @@ int main(int argc, char** argv) {
 			bool change_screen_or_plan = false;
 			bool draw = true; // used to prevent bright flashing colors when changing render args
 			while (!change_screen_or_plan) { 
-				printf("%d %d %d %d\n", render_args.donut_count, render_args.sphere_count, render_args.rect_prism_count, shape_pointer);
-
 				audio.mtx.lock();
 
 				std::vector<double> wava_out = wava_execute(audio.wava_in, audio.samples_counter, plan);
@@ -180,14 +195,22 @@ int main(int argc, char** argv) {
 
 				audio.mtx.unlock();
 
-				if (mute) {
-					fill(wava_out.begin(), wava_out.end(), 0);
-				}
-
+				if (mute) fill(wava_out.begin(), wava_out.end(), 0);
 				if (draw) render_cli_frame(shapes, screen, wava_out);
-
+                
 				change_screen_or_plan = true; // assuming that something is going to change to take statement out of cases
 				draw = false;
+
+				if (hint) {
+					if (highlight_mode) {
+						printf("\x1b[48;2;%d;%d;%d;38;2;%d;%d;%dmHIGHTLIGHT MODE\n", 255, 255, 255, 0, 0, 0);
+						printf("Highlighting shape: %d\n", shape_pointer+1);
+						printf("Shape palette: %s\n", shapes[shape_pointer]->palette.name.c_str());
+					}
+            		printf("\x1b[48;2;%d;%d;%d;38;2;%d;%d;%dmNoise gate: %f\nEffective gate: %f\nBoost: %f\nDecay rate: %f\n", 0, 0, 0, 255, 255, 255,render_args.noise_gate, 1e7 * pow(1.25, render_args.noise_gate), render_args.boost, render_args.decay_rate);
+					std::cout << last_pressed_key_message;
+
+				}
 
 				// check for relevant keyboard inputs
 				int ch = quick_read();
@@ -211,36 +234,47 @@ int main(int argc, char** argv) {
 						break;
 						case 'q': // increase detail on phi dimension
 							render_args.phi_spacing-=0.02;
+							last_pressed_key_message = std::string("Last key pressed: q, increase phi_detail");
 						break;
 						case 'a': // decrease detail on phi dimension
 							render_args.phi_spacing+=0.02;
+							last_pressed_key_message = std::string("Last key pressed: a, decrease phi_detail");
 						break;
 						case 'w': // increase detail on theta dimension
 							render_args.theta_spacing-=0.02;
+							last_pressed_key_message = std::string("Last key pressed: w, increase theta detail");
 						break;
 						case 's': // decrease detail on theta_dimension
 							render_args.theta_spacing+=0.02;
+							last_pressed_key_message = std::string("Last key pressed: s, decrease theta detail");
 						break;
 						case 'e':
 							render_args.prism_spacing-=0.02;
+							last_pressed_key_message = std::string("Last key pressed: e, increase prism detail");
 						break;
 						case 'd':
 							render_args.prism_spacing+=0.02;
+							last_pressed_key_message = std::string("Last key pressed: d, decrease prism detail");
 						break;
 						case 'r':
 							render_args.light_smoothness+=2;
+							last_pressed_key_message = std::string("Last key pressed: r, increase light smoothness");
 						break;
 						case 'f':
 							render_args.light_smoothness-=2;
+							last_pressed_key_message = std::string("Last key pressed: f, decrease light smoothness");
 						break;
 						case 'z':
 							render_args.bg_palette++;
+							last_pressed_key_message = std::string("Last key pressed: z, increment background color palette");
 						break;
 						case 'x':
 							render_args.bg_palette--;
+							last_pressed_key_message = std::string("Last key pressed: x, decrement background color palette");
 						break;
 						case 'S':
 							reload_config = true;
+							last_pressed_key_message = std::string("Last key pressed: S, reload config");
 						break;
 						case 'W':
 							// write to config
@@ -260,12 +294,44 @@ int main(int argc, char** argv) {
 							reload_config = true;
 							render_args.ignore_config = true;
 						break;
+						case '9':
+							render_args.noise_gate--;
+							last_pressed_key_message = std::string("Last key pressed: 9, decrease noise gate");
+						break;
+						case '0':
+							render_args.noise_gate++;
+							last_pressed_key_message = std::string("Last key pressed: 0, increase noise gate");
+						break;
+						case '8':
+							render_args.boost++;
+							last_pressed_key_message = std::string("Last key pressed: 8, increase boost");
+						break;
+						case '7':
+							render_args.boost--;
+							last_pressed_key_message = std::string("Last key pressed: 7, decrease boost");
+						break;
+						case '6':
+							render_args.decay_rate++;
+							last_pressed_key_message = std::string("Last key pressed: 6, increase decay rate");
+						break;
+						case '5':
+							render_args.decay_rate--;
+							last_pressed_key_message = std::string("Last key pressed: 5, decrease decay rate");
+						break;
 						case 'L': // enter shape lock mode
-							if (shapes.size() > 0) { highlight_mode = true; }
+							if (shapes.size() > 0) { 
+								highlight_mode = true; 
+								last_pressed_key_message = std::string("Last key pressed: L, shift to shape highlight mode");
+							}
 						break;
 						case 'm':
 							mute = mute ? false : true;
 							change_screen_or_plan = false;
+							last_pressed_key_message = std::string("Last key pressed: m, mute or unmute audio");
+						break;
+						case 'h':
+							hint = hint ? false : true;
+							last_pressed_key_message = std::string("Last key pressed: h, turn on hints");
 						break;
 						case ESC:
 							reload_config = true;
@@ -283,10 +349,12 @@ int main(int argc, char** argv) {
 						break;
 						case 'm':
 							mute = mute ? false : true;
-							change_screen_or_plan = false;
+							last_pressed_key_message = std::string("Last key pressed: m, mute or unmute audio");
+							printf("\x1b[2J"); // clear screen
 						break;
 						case 'V':
 							highlight_mode = false;
+							last_pressed_key_message = std::string("Last key pressed: V, change back to normal mode");
 						break;
 						case LEFT_ARROW:
 							shape_pointer--;
@@ -296,9 +364,11 @@ int main(int argc, char** argv) {
 						break;
 						case UP_ARROW:
 							shapes[shape_pointer]->increase_size();
+							last_pressed_key_message = std::string("Last key pressed: UP, increase shape size");
 						break;
 						case DOWN_ARROW:
 							shapes[shape_pointer]->decrease_size();
+							last_pressed_key_message = std::string("Last key pressed: DOWN, decrease shape size");
 						break;
 						case 'D':
 							if (shapes.size() > 0) {
@@ -315,11 +385,36 @@ int main(int argc, char** argv) {
 								}
 								delete shapes[shape_pointer];
 								shapes.erase(shapes.begin()+shape_pointer);
+								last_pressed_key_message = std::string("Last key pressed: D, delete shape");
 							}
 							if (shapes.size() == 0) { // checking if now empty, leave highlight mode if so
 								highlight_mode = false;
 								shape_pointer = -1;
 							}
+						break;
+						case 'z':
+							shapes[shape_pointer]->decrement_palette();
+							last_pressed_key_message = std::string("Last key pressed: z, decrement shape palette");
+						break;
+						case 'x':
+							shapes[shape_pointer]->increment_palette();
+							last_pressed_key_message = std::string("Last key pressed: x, increment shape palette");
+						break;
+						case 'h':
+							hint = hint ? false : true;
+							last_pressed_key_message = std::string("Last key pressed: h, turn on hints");
+						break;
+						case 'i':
+							shapes[shape_pointer]->x_offset-=0.04;
+						break;
+						case 'j':
+							shapes[shape_pointer]->y_offset+=0.04;
+						break;
+						case 'k':
+							shapes[shape_pointer]->x_offset+=0.04;
+						break;
+						case 'l':
+							shapes[shape_pointer]->y_offset-=0.04;
 						break;
 						default:
 
@@ -328,7 +423,6 @@ int main(int argc, char** argv) {
 				}
 				usleep(1000); // NEED this or some kind of delay to get results that make sense apparently
 			}
-
 		}
 		audio.mtx.lock();
 		audio.terminate = 1;
@@ -340,6 +434,8 @@ int main(int argc, char** argv) {
 	}
 
 	set_raw_mode(false);
+	printf("\n");
+
 
 	return 0;
 }
