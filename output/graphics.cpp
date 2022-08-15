@@ -109,7 +109,7 @@ Color Shape::calculate_corresponding_color(float normalized_val) {
         if (palette_index == (palette_size + ((int) (palette_size/2) + 1))) palette_index--;
         if (palette_index >= palette_size) palette_index -= palette_size;
         if (highlight) {
-            unsigned char val = (rand() % 5) + 30;
+            unsigned char val = (rand() % 20) + 70;
             return palette.colors[palette_index] + Color(val, val, val);
         }
         else {
@@ -121,9 +121,8 @@ Color Shape::calculate_corresponding_color(float normalized_val) {
         if (palette_index == palette_size) palette_index--;
 
         if (highlight) {
-            unsigned char val = (rand() % 5) + 30;
-            Color col = palette.colors[palette_index];
-            return Color(col.r + val, col.g + val, col.b + val);
+            unsigned char val = (rand() % 20) + 70;
+            return palette.colors[palette_index] + Color(val, val, val);
         }
         else {
             return palette.colors[palette_index];
@@ -137,30 +136,67 @@ ColorPalette generate_palette(int index) {
 
     switch (index) {
         case TRANS_FLAG_PALETTE:
-        {
-            std::vector<Color> colors = { Color(0x5B, 0xCE, 0xFA), Color(0xF5, 0xA9, 0xB8), Color(0xFF, 0xFF, 0xFF) };
-            palette = ColorPalette { std::string("trans"), false, colors };
-        }
+            {
+                std::vector<Color> colors = { Color(0x5B, 0xCE, 0xFA), Color(0xF5, 0xA9, 0xB8), Color(0xFF, 0xFF, 0xFF) };
+                palette = ColorPalette { std::string("trans"), false, colors };
+            }
         break;
         case PRIDE_FLAG_PALETTE:
-        {   
-            std::vector<Color> colors = { Color(0xD1, 0x22, 0x29), Color(0xF6, 0x8A, 0x1E), Color(0xFD, 0xE0, 0x1A), 
-                                    Color(0x00, 0x79, 0x40), Color(0x24, 0x40, 0x8E), Color(0x73, 0x29, 0x82) };
-            palette = ColorPalette { std::string("pride"), false, colors };
-        }
+            {   
+                std::vector<Color> colors = { Color(0xD1, 0x22, 0x29), Color(0xF6, 0x8A, 0x1E), Color(0xFD, 0xE0, 0x1A), 
+                                        Color(0x00, 0x79, 0x40), Color(0x24, 0x40, 0x8E), Color(0x73, 0x29, 0x82) };
+                palette = ColorPalette { std::string("pride"), false, colors };
+            }
         break;
         case EERIE_PALETTE:
-        {   
-            std::vector<Color> colors = { Color(0x1A, 0x18, 0x1B), Color(0x56, 0x4D, 0x65), Color(0x3E, 0x89, 0x89), 
-                                    Color(0x2C, 0xDA, 0x9D), Color(0x05, 0xF1, 0x40) };
-            palette = ColorPalette { std::string("eerie"), false, colors };
-        }
+            {   
+                std::vector<Color> colors = { Color(0x1A, 0x18, 0x1B), Color(0x56, 0x4D, 0x65), Color(0x3E, 0x89, 0x89), 
+                                        Color(0x2C, 0xDA, 0x9D), Color(0x05, 0xF1, 0x40) };
+                palette = ColorPalette { std::string("eerie"), false, colors };
+            }
+        break;
+        case PALETTE_NUM_4:
+            {
+                std::vector<Color> colors = { Color(0x29, 0x34, 0x62), Color(0x1C, 0xD6, 0xCE), Color(0xFE, 0xD8, 0x39), 
+                                        Color(0xD6, 0x1C, 0x4E) };
+                palette = ColorPalette { std::string("four"), false, colors };
+            }
+        break;
+        case MERCURY_PALETTE:
+            {
+                std::vector<Color> colors = { Color(0x50, 0x4E, 0x51), Color(0x97, 0x97, 0x9F), Color(0xCE, 0xCC, 0xD1),
+                                         Color(0xB5, 0xA7, 0xA7) };
+                palette = ColorPalette { std::string("mercury"), false, colors };
+
+            }
+        break;
+        case NEPTUNE_PALETTE:
+            {
+                std::vector<Color> colors = { Color(0x21, 0x23, 0x54), Color(0x3E, 0x54, 0xE8), Color(0x3E, 0x66, 0xF9), 
+                                        Color(0x60, 0x81, 0xFF), Color(0x89, 0xF3, 0xFF) };
+                palette = ColorPalette { std::string("neptune"), false, colors };
+            }
+        break;
+        case MARS_PALETTE:
+            {
+                std::vector<Color> colors = { Color(0x99, 0x85, 0x7A), Color(0xC6, 0x78, 0x5C), Color(0xE2, 0x7B, 0x58), 
+                                        Color(0xFF, 0x9D, 0x6F), Color(0x66, 0x39, 0x26), Color(0x8E, 0x6A, 0x5A) };
+                palette = ColorPalette { std::string("mars"), false, colors };
+            }
+        break;
+        case EARTH_PALETTE:
+            {
+                std::vector<Color> colors = { Color(0x3B, 0x5D, 0x38), Color(0x8C, 0xB1, 0xDE), Color(0x94, 0x5B, 0x47), 
+                                        Color(0x92, 0x7E, 0x77), Color(0x3C, 0x42, 0x58), Color(0xAB, 0xAC, 0xAF) };
+                palette = ColorPalette { std::string("earth"), false, colors };
+
+            }
         break;
         default:
-        {
-            std::cerr << "Invalid palette color specified, defaulting to pride.";
-            return generate_palette(0);
-        }
+            {
+                std::cerr << "Invalid palette color specified, defaulting to pride.";
+                return generate_palette(0);
+            }
         break;
     }
     return palette;
@@ -306,7 +342,6 @@ void draw_donut (Donut donut, wava_screen &screen, std::vector<double> wava_out,
     float thickness = donut.thickness * thickness_increase;
     float luminance = donut.base_luminance * luminance_increase;
     
-    
     float* ooz_data = new float[screen.x * screen.y]();
     ColorTag* output_data = new ColorTag[screen.x * screen.y]();
 
@@ -335,14 +370,13 @@ void draw_donut (Donut donut, wava_screen &screen, std::vector<double> wava_out,
             float L = (normal * screen.light);
 
             L += (log(luminance + 1)*log2_inverse) - 1;
-            if (L > 1) L = 1;
-            curr_tag.luminance = L;
 
-            if (L < 0) { // only important to check for color if luminance is larger than 0
-                L = 0; 
+            if (L <= 0) { // only important to check for color if luminance is larger than 0
+                curr_tag.luminance = 1; 
                 curr_tag.color = Color(0, 0, 0);
             }
             else {
+                curr_tag.luminance = (L > 1) ? 1 : L;
                 float dist_from_center = (thickness * cos(theta) + thickness)/(2 * thickness);
                 curr_tag.color = donut.calculate_corresponding_color(dist_from_center);
             }
@@ -395,14 +429,13 @@ void draw_sphere (Sphere sphere, wava_screen &screen, std::vector<double> wava_o
             float L = (normal * screen.light);
 
             L += (log(luminance + 1)*log2_inverse) - 1;
-            if (L > 1) L = 1;
-            curr_tag.luminance = L;
 
-            if (L < 0) { // only important to check for color if luminance is larger than 0
-                L = 0; 
+            if (L <= 0) { // only important to check for color if luminance is larger than 0
+                curr_tag.luminance = 1; 
                 curr_tag.color = Color(0, 0, 0);
             }
             else {
+                curr_tag.luminance = (L > 1) ? 1 : L;
                 float dist_from_center = abs(radius*sin(theta))/radius;
                 //float dist_from_center = (radius * cos(theta)) + radius/2;
                 curr_tag.color = sphere.calculate_corresponding_color(dist_from_center);
@@ -490,14 +523,13 @@ void draw_rect_prism (RectPrism rect_prism, wava_screen& screen, std::vector<dou
                 float L = (normal * screen.light);
 
                 L += (log(luminance + 1)*log2_inverse) - 1;
-                if (L > 1) L = 1;
-                curr_tag.luminance = L;
 
-                if (L < 0) { // only important to check for color if luminance is larger than 0
-                    L = 0; 
+                if (L <= 0) { // only important to check for color if luminance is larger than 0
+                    curr_tag.luminance = 1;
                     curr_tag.color = Color(0, 0, 0);
                 }
                 else {
+                    curr_tag.luminance = (L > 1) ? 1 : L;
                     float dist_from_center = x/width;
                     curr_tag.color = rect_prism.calculate_corresponding_color(dist_from_center);
                 }
@@ -523,19 +555,19 @@ std::vector<Shape*> generate_shapes(Setting& shape_list, int freq_bands) {
         switch((int) list[i][0]) {
             case DONUT_SHAPE:
                 {
-                    Donut* donut = new Donut(list[i][1], list[i][2], list[i][3], list[i][4], 1, freq_bands, list[i][5]);
+                    Donut* donut = new Donut(list[i][1], list[i][2], list[i][3], list[i][4], 2, freq_bands, list[i][5]);
                     shapes.push_back(donut);
                 }
             break;
             case SPHERE_SHAPE:
                 {
-                    Sphere* sphere = new Sphere(list[i][1], list[i][2], list[i][3], 1, freq_bands, list[i][4]);
+                    Sphere* sphere = new Sphere(list[i][1], list[i][2], list[i][3], 2, freq_bands, list[i][4]);
                     shapes.push_back(sphere);
                 }
             break;
             case RECT_PRISM_SHAPE:
                 {
-                    RectPrism* rect_prism = new RectPrism(list[i][1], list[i][2], list[i][3], list[i][4], list[i][5], 1, freq_bands, list[i][6]);
+                    RectPrism* rect_prism = new RectPrism(list[i][1], list[i][2], list[i][3], list[i][4], list[i][5], 2, freq_bands, list[i][6]);
                     shapes.push_back(rect_prism);
                 }
             break;

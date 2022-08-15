@@ -59,7 +59,7 @@ void render_cli_frame (std::vector<Shape*> shapes, wava_screen &screen, std::vec
                 //printf("luminance is %f\n", luminance);
             }
 
-            if (luminance <= 0.01 && (color == Color(0, 0, 0))) { 
+            if (luminance <= 0 && (color == Color(0, 0, 0))) { 
                 for (int i = 0; i < 12; i++) {
                     color = wava_out[i + 3] * screen.bg_palette.colors[i % screen.bg_palette.colors.size()] + color;
                 }

@@ -95,6 +95,10 @@ int main(int argc, char** argv) {
 				std::cout << "Thank you, wava is now exiting." << std::endl;
 				exit(0);
 			}
+			else {
+				std::cout << "Invalid input, wava is now closing." << std::endl;
+				exit(-1);
+			}
 		}
 	}
 	catch(const SettingNotFoundException& nfex) {
@@ -123,8 +127,8 @@ int main(int argc, char** argv) {
 	std::string last_pressed_key_message("");
 
 	while (!quit) {
-		int screen_x = 30; 
-		int screen_y = 30;
+		int screen_x = 40; 
+		int screen_y = 40;
 
 		// Load config values
 		std::vector<Shape*> shapes;
@@ -187,6 +191,12 @@ int main(int argc, char** argv) {
 			if (wava_args.noise_gate < 0) wava_args.noise_gate = 0;
 			if (wava_args.noise_gate > 100) wava_args.noise_gate = 100;
 
+			if (wava_args.decay_rate < 0) wava_args.decay_rate = 0;
+			if (wava_args.decay_rate > 100) wava_args.decay_rate = 100;
+
+			if (wava_args.boost < 0) wava_args.boost = 0;
+			if (wava_args.boost > 100) wava_args.boost = 100;
+
 			if (highlight_mode) {
 				if (shape_pointer >= shapes.size()) { 
 					shape_pointer = 0; 
@@ -235,7 +245,7 @@ int main(int argc, char** argv) {
 						printf("Highlighting shape: %d\n", shape_pointer+1);
 						printf("Shape palette: %s\n", shapes[shape_pointer]->palette.name.c_str());
 					}
-            		printf("\x1b[48;2;%d;%d;%d;38;2;%d;%d;%dmNoise gate: %d\nEffective gate: %f\nBrightness: %d\nDecay rate: %d\n", 0, 0, 0, 255, 255, 255,wava_args.noise_gate, 1e7 * pow(1.25, wava_args.noise_gate), wava_args.boost, wava_args.decay_rate);
+            		printf("\x1b[48;2;%d;%d;%d;38;2;%d;%d;%dmBackground palette: %s\nNoise gate: %d\nBrightness: %d\nDecay rate: %d\n", 0, 0, 0, 255, 255, 255, screen.bg_palette.name.c_str(), wava_args.noise_gate, wava_args.boost, wava_args.decay_rate);
 					std::cout << last_pressed_key_message;
 
 				}
@@ -276,11 +286,11 @@ int main(int argc, char** argv) {
 								break;
 								case 'q': // increase detail on phi dimension
 									wava_args.phi_spacing-=0.02;
-									last_pressed_key_message = std::string("Last key pressed: q, increase phi_detail");
+									last_pressed_key_message = std::string("Last key pressed: q, increase phi detail");
 								break;
 								case 'a': // decrease detail on phi dimension
 									wava_args.phi_spacing+=0.02;
-									last_pressed_key_message = std::string("Last key pressed: a, decrease phi_detail");
+									last_pressed_key_message = std::string("Last key pressed: a, decrease phi detail");
 								break;
 								case 'w': // increase detail on theta dimension
 									wava_args.theta_spacing-=0.02;
@@ -393,38 +403,38 @@ int main(int argc, char** argv) {
 								break;
 								case '3': // add rect prism
 									{
-										RectPrism* rect_prism = new RectPrism(0.5, 0.5, 0.5, 0, 0, 2, wava_plan::freq_bands, 0);
+										RectPrism* rect_prism = new RectPrism(1, 1, 1, 0, 0, 2, wava_plan::freq_bands, 0);
 										shapes.push_back(rect_prism);
 									}
 								break;
-								case '9':
+								case 'c':
 									wava_args.noise_gate--;
-									last_pressed_key_message = std::string("Last key pressed: 9, decrease noise gate");
+									last_pressed_key_message = std::string("Last key pressed: c, decrease noise gate");
 								break;
-								case '0':
+								case 'v':
 									wava_args.noise_gate++;
-									last_pressed_key_message = std::string("Last key pressed: 0, increase noise gate");
+									last_pressed_key_message = std::string("Last key pressed: v, increase noise gate");
 								break;
-								case '8':
+								case 'n':
 									wava_args.boost++;
-									last_pressed_key_message = std::string("Last key pressed: 8, increase boost");
+									last_pressed_key_message = std::string("Last key pressed: n, increase brightness");
 								break;
-								case '7':
+								case 'b':
 									wava_args.boost--;
-									last_pressed_key_message = std::string("Last key pressed: 7, decrease boost");
+									last_pressed_key_message = std::string("Last key pressed: b, decrease brightness");
 								break;
-								case '6':
+								case 'k':
 									wava_args.decay_rate++;
-									last_pressed_key_message = std::string("Last key pressed: 6, increase decay rate");
+									last_pressed_key_message = std::string("Last key pressed: j, increase decay rate");
 								break;
-								case '5':
+								case 'j':
 									wava_args.decay_rate--;
-									last_pressed_key_message = std::string("Last key pressed: 5, decrease decay rate");
+									last_pressed_key_message = std::string("Last key pressed: h, decrease decay rate");
 								break;
-								case 'L': // enter shape lock mode
+								case 'H': // enter shape lock mode
 									if (shapes.size() > 0) { 
 										highlight_mode = true; 
-										last_pressed_key_message = std::string("Last key pressed: L, shift to shape highlight mode");
+										last_pressed_key_message = std::string("Last key pressed: H, shift to shape highlight mode");
 									}
 								break;
 								default:
@@ -435,9 +445,9 @@ int main(int argc, char** argv) {
 						else { // in shape highlighting mode
 							switch(ch) {
 
-								case 'V':
+								case 'N':
 									highlight_mode = false;
-									last_pressed_key_message = std::string("Last key pressed: V, change back to normal mode");
+									last_pressed_key_message = std::string("Last key pressed: N, change back to normal mode");
 								break;
 								case LEFT_ARROW:
 									shape_pointer--;
@@ -472,16 +482,16 @@ int main(int argc, char** argv) {
 									shapes[shape_pointer]->increment_palette();
 									last_pressed_key_message = std::string("Last key pressed: x, increment shape palette");
 								break;
-								case 'i':
+								case 'w':
 									shapes[shape_pointer]->x_offset-=0.04;
 								break;
-								case 'j':
+								case 'a':
 									shapes[shape_pointer]->y_offset+=0.04;
 								break;
-								case 'k':
+								case 's':
 									shapes[shape_pointer]->x_offset+=0.04;
 								break;
-								case 'l':
+								case 'd':
 									shapes[shape_pointer]->y_offset-=0.04;
 								break;
 								default:
