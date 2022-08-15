@@ -24,6 +24,8 @@ in your terminal on Ubuntu/Debian systems.
 
 after dependencies are installed, run
 ```
+mkdir -p ~/.config/wava 
+cp -p ./config/wava.cfg ~/.config/wava/
 make
 sudo make install
 ```
@@ -31,9 +33,16 @@ in the cloned repo to install wava.
 
 to uninstall, run
 ```
-make uninstall
+rm -rf ~/.config/wava
+sudo make uninstall
 ```
 in the cloned repo. 
+
+by default, wava is installed to `/usr/local/bin/`. if you would like to change that, run
+```
+make install PREFIX=<desired dir>
+```
+and make sure to use the same prefix for `make uninstall`.
 
 # usage
 
@@ -69,8 +78,11 @@ that is pretty much all you need to know to use wava. the next section has an en
 # keybinds
 
 **normal AND highlight mode:**
+
 `m` - enable/disable response to audio
+
 `ESC` - quit wava
+
 `h` - turn on/off description below window
 
 **normal mode:**
