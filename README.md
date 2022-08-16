@@ -40,7 +40,7 @@ dnf install alsa-lib-devel fftw3-devel pulseaudio-libs-devel libconfig-devel lib
 openSUSE
 
 ```
-zypper install alsa-devel fftw3-devel libpulse-devel libtool
+zypper install alsa-devel fftw3-devel libpulse-devel libtool libconfig-devel
 ```
 
 after dependencies are installed, run
