@@ -22,7 +22,26 @@ sudo apt-get install -y libpulseaudio-dev libasound2-dev libfftw3-dev libconfig+
 ```
 in your terminal on Ubuntu/Debian systems.
 
-i am not sure how installing these dependencies would work on other systems, but i was able to find the AURs for [fftw](https://aur.archlinux.org/packages/lib32-fftw) and [libconfig](https://aur.archlinux.org/packages/libconfig9).
+
+i am not familiar with installing dependencies on other systems, but i believe these commands should work:
+
+Arch
+
+```
+pacman -S base-devel fftw alsa-lib pulseaudio libconfig
+```
+
+Fedora
+
+```
+dnf install alsa-lib-devel fftw3-devel pulseaudio-libs-devel libconfig-devel libtool
+```
+
+openSUSE
+
+```
+zypper install alsa-devel fftw3-devel libpulse-devel libtool
+```
 
 after dependencies are installed, run
 ```
