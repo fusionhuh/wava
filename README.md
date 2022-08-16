@@ -10,7 +10,7 @@ wava is a commandline audio visualizer for Pulseaudio (ALSA coming soon) that is
 audio with bars like cava and many other visualizers, wava focuses on creating aesthetic scenes by using colors and shapes 
 that react to characteristics of the sounds being played like pitch and amplitude.
 
-**WARNING**: **wava can produce a lot of flashing lights and colors that may be unsuitable for individuals with epilepsy.** if you would just like to use wava to create fun shapes, you can run wava and press `m` to prevent any response to audio.
+**WARNING**: **wava can produce a lot of flashing lights and colors that may be unsuitable for individuals with epilepsy.**
 
 # installation
 
@@ -21,6 +21,8 @@ to install all required dependenecies, simply run
 sudo apt-get install -y libpulseaudio-dev libasound2-dev libfftw3-dev libconfig++-dev
 ```
 in your terminal on Ubuntu/Debian systems.
+
+i am not sure how installing these dependencies would work on other systems, but i was able to find the AURs for [fftw](https://aur.archlinux.org/packages/lib32-fftw) and [libconfig](https://aur.archlinux.org/packages/libconfig9).
 
 after dependencies are installed, run
 ```
@@ -61,7 +63,7 @@ now that the background is configured to your liking, you can start adding shape
 
 wava has a range of color palettes that can be assigned to the background and individual shapes. to change the background color palette, press `z`/`x`. the name of the palette should appear under the rendering window. in order to change the palette of individual shapes, you must change to highlight mode.
 
-wava has two modes to make better use of the keyboard. the first is normal mode in which you can generate new shapes and how they are rendered, change background colors, change audio settings as we did earlier, and read from/write to a config file. the second mode is "highlight" mode, in which you can select individual shapes and change their characteristics like color, size, and position on the screen. in order to change to highlight mode, have at least one shape on screen and press `L`. if it changed successfully, you should see "HIGHLIGHT MODE" under the render screen.
+wava has two modes to make better use of the keyboard. the first is normal mode in which you can generate new shapes and how they are rendered, change background colors, change audio responsiveness settings, and read from/write to a config file. the second mode is "highlight" mode, in which you can select individual shapes and change their characteristics like color, size, and position on the screen. in order to change to highlight mode, have at least one shape on screen and press `L`. if it changed successfully, you should see "HIGHLIGHT MODE" under the render window.
 
 now, one of the shapes on screen should be a different color—this means that it is selected and you can change its individual characteristics. to change its palette, press `z`/`x` like you did to change the background palette. again, the name of the palette should appear below the rendering window. you can also increase or decrease its size by pressing the up arrow and down arrow keys respectively, and you can change its position with the `w`, `a`, `s`, and `d` keys. 
 
@@ -71,7 +73,7 @@ after you've made the desired changes to your shapes, you can press `V` to chang
 
 if you really enjoy the scene you've made, you can save to the config file with `W`. if you would like to reload to your previously saved scene, press `R`.
 
-once you're done using wava, press `ESC` to exit (exiting forcefully with Ctrl+Z is disabled because it can require a restart of the pulseaudio server).
+once you're done using wava, press `ESC` to exit (exiting forcefully is not recommended because it can require a restart of the pulseaudio server).
 
 that is pretty much all you need to know to use wava. the next section has an entire list of the keybinds
 
