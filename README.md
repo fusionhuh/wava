@@ -84,7 +84,7 @@ wava has a range of color palettes that can be assigned to the background and in
 
 wava has two modes to make better use of the keyboard. the first is normal mode in which you can generate new shapes and how they are rendered, change background colors, change audio responsiveness settings, and read from/write to a config file. the second mode is "highlight" mode, in which you can select individual shapes and change their characteristics like color, size, and position on the screen. in order to change to highlight mode, have at least one shape on screen and press `H`. if it changed successfully, you should see "HIGHLIGHT MODE" under the render window.
 
-now, one of the shapes on screen should be a different color—this means that it is selected and you can change its individual characteristics. to change its palette, press `z`/`x` like you did to change the background palette. again, the name of the palette should appear below the rendering window. you can also increase or decrease its size by pressing the up arrow and down arrow keys respectively, and you can change its position with the `w`, `a`, `s`, and `d` keys. 
+now one of the shapes on screen should be a different color—this means that it is selected and you can change its individual characteristics. to change its palette, press `z`/`x` like you did to change the background palette. again, the name of the palette should appear below the rendering window. you can also increase or decrease its size by pressing the up arrow and down arrow keys respectively, and you can change its position with the `w`, `a`, `s`, and `d` keys. 
 
 to change which shape is being selected, press the left or right arrow keys. to delete the selected shape, press `D`.
 
