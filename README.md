@@ -82,13 +82,13 @@ now that the background is configured to your liking, you can start adding shape
 
 wava has a range of color palettes that can be assigned to the background and individual shapes. to change the background color palette, press `z`/`x`. the name of the palette should appear under the rendering window. in order to change the palette of individual shapes, you must change to highlight mode.
 
-wava has two modes to make better use of the keyboard. the first is normal mode in which you can generate new shapes and how they are rendered, change background colors, change audio responsiveness settings, and read from/write to a config file. the second mode is "highlight" mode, in which you can select individual shapes and change their characteristics like color, size, and position on the screen. in order to change to highlight mode, have at least one shape on screen and press `L`. if it changed successfully, you should see "HIGHLIGHT MODE" under the render window.
+wava has two modes to make better use of the keyboard. the first is normal mode in which you can generate new shapes and how they are rendered, change background colors, change audio responsiveness settings, and read from/write to a config file. the second mode is "highlight" mode, in which you can select individual shapes and change their characteristics like color, size, and position on the screen. in order to change to highlight mode, have at least one shape on screen and press `H`. if it changed successfully, you should see "HIGHLIGHT MODE" under the render window.
 
 now, one of the shapes on screen should be a different color—this means that it is selected and you can change its individual characteristics. to change its palette, press `z`/`x` like you did to change the background palette. again, the name of the palette should appear below the rendering window. you can also increase or decrease its size by pressing the up arrow and down arrow keys respectively, and you can change its position with the `w`, `a`, `s`, and `d` keys. 
 
 to change which shape is being selected, press the left or right arrow keys. to delete the selected shape, press `D`.
 
-after you've made the desired changes to your shapes, you can press `V` to change back to normal mode. 
+after you've made the desired changes to your shapes, you can press `N` to change back to normal mode. 
 
 if you really enjoy the scene you've made, you can save to the config file with `W`. if you would like to reload to your previously saved scene, press `R`.
 
@@ -149,6 +149,8 @@ arrow keys - change size of window
 `w`/`a`/`s`/`d` - change position of selected shape
 
 `D` - delete selected shape
+
+`N` - change back to normal mode
 
 
 
