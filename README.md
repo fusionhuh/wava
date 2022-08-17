@@ -152,6 +152,15 @@ arrow keys - change size of window
 
 `N` - change back to normal mode
 
+# acknowledgements
+
+credit to: 
+
+https://github.com/ShakaUVM/colors for helpful ncurses alternative 
+
+https://github.com/Dugy/quick_arg_parser for easy-to-use arg parser
+
+
 
 
 
