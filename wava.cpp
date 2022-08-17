@@ -110,7 +110,7 @@ int main(int argc, char** argv) {
 		exit(-1);
 	}
 	catch(const FileIOException &fioex) {
-		std::cerr << "Error occurred while writing to config file, it may be missing. Try reinstalling wava." << std::endl;
+		std::cerr << "Error occurred while writing to config file, it may be missing. Try pasting the config file from the repo into ~/.config/wava/ again." << std::endl;
 		exit(-1);
 	}
 
@@ -174,6 +174,20 @@ int main(int argc, char** argv) {
 
 		while (!reload_config) { // while (!reloadConf) 
 			printf("\x1b[2J"); // clear screen
+
+			const auto [term_rows, term_cols] = get_terminal_size();
+			if (screen_x*2 >= term_cols + 1) screen_x = (term_cols/2);
+			if (hint) {
+				if (highlight_mode) {
+					if (screen_y + 10 >= term_rows + 1) screen_y = term_rows - 10;
+				}
+				else { 
+					if (screen_y + 6 >= term_rows + 1) screen_y = term_rows - 6;
+				}
+			}
+			else {
+				if (screen_y >= term_rows + 1) screen_y = term_rows;
+			}
 
 			if (screen_x < 5) screen_x = 5; // avoids segfault with negative values
 			if (screen_y < 5) screen_y = 5;

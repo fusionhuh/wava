@@ -329,7 +329,6 @@ void wava_screen::write_to_z_buffer_and_output(const float* zbuffer, const Color
   mtx.unlock();
 }
 
-
 void draw_donut (Donut donut, wava_screen &screen, std::vector<double> wava_out, float A, float B) {
     double theta_spacing = (donut.highlight) ? THETA_SPACING : screen.theta_spacing;
     double phi_spacing = (donut.highlight) ? PHI_SPACING : screen.phi_spacing;
