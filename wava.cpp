@@ -444,7 +444,6 @@ int main(int argc, char** argv) {
 						}
 						else { // in shape highlighting mode
 							switch(ch) {
-
 								case 'N':
 									highlight_mode = false;
 									last_pressed_key_message = std::string("Last key pressed: N, change back to normal mode");
