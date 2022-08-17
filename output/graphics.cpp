@@ -334,11 +334,11 @@ void draw_donut (Donut donut, wava_screen &screen, std::vector<double> wava_out,
     double theta_spacing = (donut.highlight) ? THETA_SPACING : screen.theta_spacing;
     double phi_spacing = (donut.highlight) ? PHI_SPACING : screen.phi_spacing;
 
-    double radius_increase = (donut.radius_weighting_function * wava_out * 0.5) + 1;
+    double radius_increase = (donut.radius_weighting_function * wava_out * 0.8);
     double thickness_increase = (donut.thickness_weighting_function * wava_out) + 1;
     double luminance_increase = (donut.luminance_weighting_function * wava_out * 2) + 1;
 
-    float radius = donut.radius * radius_increase * radius_increase;
+    float radius = donut.radius + radius_increase;
     float thickness = donut.thickness * thickness_increase;
     float luminance = donut.base_luminance * luminance_increase;
     
@@ -395,10 +395,10 @@ void draw_sphere (Sphere sphere, wava_screen &screen, std::vector<double> wava_o
     double theta_spacing = (sphere.highlight) ? THETA_SPACING : screen.theta_spacing;
     double phi_spacing = (sphere.highlight) ? PHI_SPACING : screen.phi_spacing;
 
-    double radius_increase = (sphere.radius_weighting_function * wava_out) + 1;
+    double radius_increase = (sphere.radius_weighting_function * wava_out) * 0.8;
     double luminance_increase = (sphere.luminance_weighting_function * wava_out) + 1;
     
-    float radius = sphere.radius * radius_increase;
+    float radius = sphere.radius + radius_increase;
     float luminance = sphere.base_luminance * luminance_increase;
 
     float* ooz_data = new float[screen.x * screen.y]();
@@ -454,12 +454,12 @@ void draw_sphere (Sphere sphere, wava_screen &screen, std::vector<double> wava_o
 void draw_rect_prism (RectPrism rect_prism, wava_screen& screen, std::vector<double> wava_out, float A, float B) {
     double prism_spacing = (rect_prism.highlight) ? PRISM_SPACING : screen.prism_spacing;
 
-    double volume_increase = (rect_prism.volume_weighting_function * wava_out * 0.5) + 1;
-    double luminance_increase = (rect_prism.luminance_weighting_function * wava_out) + 1;
+    double volume_increase = (rect_prism.volume_weighting_function * wava_out * 0.5) * 1.1;
+    double luminance_increase = (rect_prism.luminance_weighting_function * wava_out) * 1.1;
 
-    float width = rect_prism.width * volume_increase;
-    float height = rect_prism.height * volume_increase;
-    float depth = rect_prism.depth * volume_increase;
+    float width = rect_prism.width + volume_increase;
+    float height = rect_prism.height + volume_increase;
+    float depth = rect_prism.depth + volume_increase;
 
     float luminance = rect_prism.base_luminance * luminance_increase;
 
