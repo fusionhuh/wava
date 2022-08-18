@@ -14,22 +14,17 @@ that react to characteristics of the sounds being played like pitch and amplitud
 
 # installation
 
-to build, wava requires FFTW, libconfig, and Pulseaudio/ALSA dev files.
+for Arch systems, there is an AUR available here: https://aur.archlinux.org/packages/wava-git
 
-to install all required dependenecies, simply run
+to build from source, wava requires FFTW, libconfig, and Pulseaudio/ALSA dev files.
+
+to install all required dependenecies on Debian/Ubuntu systems, simply run
 ```
 sudo apt-get install -y libpulseaudio-dev libasound2-dev libfftw3-dev libconfig++-dev
 ```
-in your terminal on Ubuntu/Debian systems.
-
+in your terminal.
 
 i am not familiar with installing dependencies on other systems, but i believe these commands should work:
-
-Arch
-
-```
-pacman -S base-devel fftw alsa-lib pulseaudio libconfig
-```
 
 Fedora
 
