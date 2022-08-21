@@ -28,8 +28,8 @@
 
 #include <fftw3.h>
 
-#include <common.h>
-#include <pulse.h>
+#include <common.hpp>
+#include <pulse.hpp>
 
 #include <wavatransform.hpp>
 
