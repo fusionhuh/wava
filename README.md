@@ -6,7 +6,7 @@
 
 # about
 
-wava is a commandline audio visualizer for Pulseaudio (ALSA coming soon) that is heavily inspired by [cava](https://github.com/karlstav/cava). however, instead of visualizing
+wava is a commandline audio visualizer for Pulseaudio and ALSA that is heavily inspired by [cava](https://github.com/karlstav/cava). however, instead of visualizing
 audio with bars like cava and many other visualizers, wava focuses on creating aesthetic scenes by using colors and shapes 
 that react to characteristics of the sounds being played like pitch and amplitude.
 
